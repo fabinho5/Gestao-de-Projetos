@@ -148,8 +148,6 @@ Foram identificadas as seguintes áreas funcionais principais:
 
 
 
-* Eliminação de duplicações.
-
 
 
 
@@ -385,4 +383,5 @@ Foram identificadas as seguintes áreas funcionais principais:
 
 
 A reunião permitiu recolher uma visão detalhada do funcionamento interno da Fundapeças e definir o catálogo funcional que servirá de base ao desenvolvimento da aplicação móvel.
+
 
