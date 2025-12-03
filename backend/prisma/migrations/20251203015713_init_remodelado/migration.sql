@@ -83,6 +83,16 @@ CREATE TABLE `specifications` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
+CREATE TABLE `category_specifications` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `category_id` INTEGER NOT NULL,
+    `spec_id` INTEGER NOT NULL,
+
+    UNIQUE INDEX `category_specifications_category_id_spec_id_key`(`category_id`, `spec_id`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `part_specifications` (
     `part_id` INTEGER NOT NULL,
     `spec_id` INTEGER NOT NULL,
@@ -184,6 +194,12 @@ ALTER TABLE `parts` ADD CONSTRAINT `parts_location_id_fkey` FOREIGN KEY (`locati
 
 -- AddForeignKey
 ALTER TABLE `part_images` ADD CONSTRAINT `part_images_part_id_fkey` FOREIGN KEY (`part_id`) REFERENCES `parts`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `category_specifications` ADD CONSTRAINT `category_specifications_category_id_fkey` FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `category_specifications` ADD CONSTRAINT `category_specifications_spec_id_fkey` FOREIGN KEY (`spec_id`) REFERENCES `specifications`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `part_specifications` ADD CONSTRAINT `part_specifications_part_id_fkey` FOREIGN KEY (`part_id`) REFERENCES `parts`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

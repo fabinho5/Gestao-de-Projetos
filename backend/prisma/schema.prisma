@@ -70,6 +70,11 @@ model Category {
   children  Category[] @relation("CategoryHierarchy")
   
   parts     Part[]
+  
+  // --- NOVA RELAÇÃO ---
+  // Uma categoria define quais especificações são permitidas nela
+  allowedSpecs CategorySpecification[]
+
   deletedAt DateTime?  @map("deleted_at")
 
   @@map("categories")
@@ -101,9 +106,6 @@ model Part {
   supplierId  Int?      @map("supplier_id")
   supplier    Supplier? @relation(fields: [supplierId], references: [id])
 
-  // --- ALTERAÇÃO PRINCIPAL ---
-  // A peça agora mora diretamente numa localização.
-  // Se estiver NULL, significa que a peça não está em stock (vendida ou perdida).
   locationId  Int?      @map("location_id")
   location    Location? @relation(fields: [locationId], references: [id])
   
@@ -112,7 +114,10 @@ model Part {
   deletedAt   DateTime? @map("deleted_at")
 
   images         PartImage[]
-  specifications PartSpecification[]
+  
+  // Aqui guardamos os VALORES (ex: "150.000")
+  specifications PartSpecification[] 
+  
   movements      StockMovement[]
   reservationItems ReservationItem[]
   favoritedBy    UserFavorite[]
@@ -130,15 +135,38 @@ model PartImage {
   @@map("part_images")
 }
 
+// DEFINIÇÃO DA ESPECIFICAÇÃO (O NOME)
+// Ex: Nome="Quilómetros", Unit="km"
 model Specification {
   id        Int                 @id @default(autoincrement())
   name      String              
   unit      String?             
-  values    PartSpecification[]
+  
+  // Relações
+  categories CategorySpecification[] // Usada nestas categorias
+  values     PartSpecification[]     // Tem estes valores nas peças
 
   @@map("specifications")
 }
 
+// --- NOVA TABELA ---
+// Liga a Categoria à Especificação (O Template)
+// Diz: "A categoria Motores TEM o campo Quilómetros"
+model CategorySpecification {
+  id         Int @id @default(autoincrement())
+  categoryId Int @map("category_id")
+  specId     Int @map("spec_id")
+
+  category   Category      @relation(fields: [categoryId], references: [id])
+  spec       Specification @relation(fields: [specId], references: [id])
+
+  @@unique([categoryId, specId]) // Não podes adicionar a mesma spec duas vezes à mesma categoria
+  @@map("category_specifications")
+}
+
+// VALOR DA ESPECIFICAÇÃO
+// Liga a Peça à Especificação com um VALOR
+// Diz: "O Motor X tem 150.000 no campo Quilómetros"
 model PartSpecification {
   partId    Int           @map("part_id")
   specId    Int           @map("spec_id")
