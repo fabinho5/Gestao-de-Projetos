@@ -1,4 +1,5 @@
 import { prisma } from '../src/lib/prisma.js';
+import { PartCondition } from '@prisma/client'; // <--- IMPORTA O ENUM
 import bcrypt from 'bcryptjs';
 
 async function main() {
@@ -29,8 +30,7 @@ async function main() {
     },
   });
 
-  // 4. ESPECIFICAÇÕES GERAIS (Globais)
-  // Criamos as especificações que podem ser usadas em qualquer peça
+  // 4. ESPECIFICAÇÕES GERAIS
   const specVoltagem = await prisma.specification.create({
     data: { name: 'Voltagem', unit: 'V' }
   });
@@ -41,22 +41,17 @@ async function main() {
   
   console.log('✅ Especificações criadas');
 
-  // 5. CATEGORIA (CORREÇÃO AQUI)
-  // Criamos apenas a categoria. Já NÃO ligamos specs aqui (tabela CategorySpecification foi removida).
+  // 5. CATEGORIA
   const catMotor = await prisma.category.create({
     data: {
       name: 'Motor',
       children: {
-        create: [
-          { name: 'Componentes Elétricos' } // <--- Simples, sem allowedSpecs
-        ]
+        create: [ { name: 'Componentes Elétricos' } ]
       }
     }
   });
 
-  console.log('✅ Categorias criadas');
-
-  // 6. BUSCAR OS IDs PARA CRIAR A PEÇA
+  // 6. BUSCAR OS IDs
   const subCat = await prisma.category.findFirst({ 
     where: { name: 'Componentes Elétricos' } 
   });
@@ -64,27 +59,36 @@ async function main() {
     where: { fullCode: 'W01-R01-S01' } 
   });
 
-  // 7. CRIAR PEÇA COM VALORES REAIS
-  // Aqui dizemos: "ESTA peça específica tem 12V e 150A"
+  // 7. CRIAR PEÇA COMPLETA
   if (subCat && loc) {
     await prisma.part.create({
       data: {
         name: 'Alternador BMW E46',
         refInternal: 'ALT-BMW-001',
+        refOEM: '12317501599',
         price: 85.00,
+        condition: PartCondition.USED, // <--- USAR O ENUM
         categoryId: subCat.id,
         locationId: loc.id,
         
-        // PREENCHER OS VALORES DAS ESPECIFICAÇÕES
+        // ESPECIFICAÇÕES
         specifications: {
           create: [
-            { specId: specVoltagem.id, value: '12' },   // Valor: 12
-            { specId: specAmperagem.id, value: '150' }  // Valor: 150
+            { specId: specVoltagem.id, value: '12' },
+            { specId: specAmperagem.id, value: '150' }
+          ]
+        }, // <--- FALTAVA ESTA VÍRGULA AQUI!
+
+        // SUB-REFERÊNCIAS
+        subReferences: {
+          create: [
+            { value: '0986041500' }, // Ref Bosch
+            { value: 'LRA02854' }    // Ref Lucas
           ]
         }
       }
     });
-    console.log('✅ Peça criada com Stock e Especificações');
+    console.log('✅ Peça criada com Stock, Specs e Sub-Refs');
   }
 }
 

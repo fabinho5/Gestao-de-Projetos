@@ -35,11 +35,11 @@ export class PartsService {
         condition: string; 
         categoryId: number;
         locationId: number;
-        // NOVO: Receber as specs (opcional)
+        // NOVO: Receber as specs (opcional), maybe no futuro isto vai passar a ser obrigatório, tenho de ver com o fabio ainda
         specifications?: { specId: number; value: string }[];
     }) {
     
-        // 1. Validação de Capacidade (Perfeito!)
+        // verificamos a capacidade
         const location = await prisma.location.findUnique({
             where: { id: data.locationId },
             include: { 
@@ -55,7 +55,8 @@ export class PartsService {
             throw new Error(`A localização ${location.fullCode} está cheia! (${location._count.parts}/${location.capacity})`);
         }
 
-        // 2. Criar a peça
+        
+        // se cheganmos aqui, é porque está tudo ok
         return prisma.part.create({
             data: {
                 name: data.name,
@@ -66,7 +67,7 @@ export class PartsService {
                 categoryId: data.categoryId,
                 locationId: data.locationId,
                 
-                // 3. NOVO: Gravar as especificações recebidas
+                // NOVO: Gravar as especificações recebidas
                 // O Prisma faz um loop automático e cria as linhas na tabela PartSpecification
                 specifications: {
                     create: data.specifications // Ex: [{ specId: 1, value: "12" }]
