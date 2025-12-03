@@ -6,7 +6,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// GERA O DIAGRAMA PARA O TEU RELATÓRIO
 generator erd {
   provider = "prisma-erd-generator"
   output   = "../ERD.svg"
@@ -101,12 +100,17 @@ model Part {
   category    Category  @relation(fields: [categoryId], references: [id])
   supplierId  Int?      @map("supplier_id")
   supplier    Supplier? @relation(fields: [supplierId], references: [id])
+
+  // --- ALTERAÇÃO PRINCIPAL ---
+  // A peça agora mora diretamente numa localização.
+  // Se estiver NULL, significa que a peça não está em stock (vendida ou perdida).
+  locationId  Int?      @map("location_id")
+  location    Location? @relation(fields: [locationId], references: [id])
   
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  locations      PartLocation[]
   images         PartImage[]
   specifications PartSpecification[]
   movements      StockMovement[]
@@ -171,24 +175,20 @@ model Location {
   pallet      String?   
   fullCode    String    @unique @map("full_code") 
 
-  parts       PartLocation[]
+  // --- NOVA FUNCIONALIDADE: SLOTS ---
+  // Define quantas peças cabem aqui. Ex: Uma prateleira pode ter capacidade 5.
+  capacity    Int       @default(1) 
+
+  // Relação inversa: Uma localização tem VÁRIAS peças
+  parts       Part[]
+
   movementsFrom StockMovement[] @relation("SourceLocation")
   movementsTo   StockMovement[] @relation("DestLocation")
 
   @@map("locations")
 }
 
-model PartLocation {
-  partId     Int      @map("part_id")
-  locationId Int      @map("location_id")
-  quantity   Int      
-  
-  part       Part     @relation(fields: [partId], references: [id])
-  location   Location @relation(fields: [locationId], references: [id])
-
-  @@id([partId, locationId])
-  @@map("part_locations")
-}
+// APAGUEI A TABELA PartLocation (Já não é necessária)
 
 // --------------------------------------
 // 4. MÓDULO OPERAÇÕES
@@ -221,7 +221,9 @@ model ReservationItem {
   id            Int         @id @default(autoincrement())
   reservationId Int         @map("reservation_id")
   partId        Int         @map("part_id")
-  quantity      Int
+  // Quantity removido? Não, mantém-se 1, mas pode ficar se quiseres reservar 
+  // múltiplas peças diferentes num futuro pack.
+  quantity      Int         @default(1)
   
   reservation   Reservation @relation(fields: [reservationId], references: [id])
   part          Part        @relation(fields: [partId], references: [id])
@@ -242,7 +244,8 @@ model StockMovement {
   partId      Int          @map("part_id")
   userId      Int          @map("user_id")
   type        MovementType
-  quantity    Int          
+  
+  // quantity removida porque a peça é única (é sempre 1)
   
   sourceLocId Int?         @map("source_location_id")
   destLocId   Int?         @map("dest_location_id")
