@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { PartCondition } from '@prisma/client';
+import { MovementType, PartCondition } from '@prisma/client';
 
 export class PartsService {
     
@@ -39,6 +39,7 @@ export class PartsService {
         locationId: number;
         specifications?: { specId: number; value: string }[];
         subReferences?: string[];
+        userId: number;
     }) {
     
         // verificamos a capacidade
@@ -75,18 +76,25 @@ export class PartsService {
                     create: data.specifications
                 },
 
-                // <--- NOVO: Gravar Sub-Referências
-                // Transforma ["REF1", "REF2"] em [{ value: "REF1" }, { value: "REF2" }]
                 subReferences: {
                     create: data.subReferences?.map(ref => ({ value: ref }))
-                }
+                },
+
+                movements: {
+                    create: { 
+                        type: MovementType.ENTRY,
+                        userId: data.userId,
+                        destLocId: data.locationId,
+                    }
+                },
             },
             include: { 
                 category: true, 
                 location: true, 
                 specifications: { include: { spec: true } },
                 subReferences: true,
-                images: true
+                images: true,
+                movements: true,
             }
         });
     }
