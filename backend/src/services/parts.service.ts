@@ -2,13 +2,14 @@ import { prisma } from '../lib/prisma.js';
 
 export class PartsService {
     
-   
     static async getAllParts() {
         return prisma.part.findMany({
             include: { 
                 category: true,
                 location: true,
-                images: true
+                images: true,
+                // NOVO: Queremos ver as especificações quando listamos
+                specifications: { include: { spec: true } } 
             }
         });
     }
@@ -19,7 +20,9 @@ export class PartsService {
             include: { 
                 category: true, 
                 location: true,
-                images: true
+                images: true,
+                // NOVO: Traz os valores e o nome da spec (ex: "Voltagem: 12V")
+                specifications: { include: { spec: true } }
             }
         });
     }
@@ -32,16 +35,15 @@ export class PartsService {
         condition: string; 
         categoryId: number;
         locationId: number;
+        // NOVO: Receber as specs (opcional)
+        specifications?: { specId: number; value: string }[];
     }) {
     
-        // emboram vamos ter uma api que diz quais estao disponiveis ou nao, devemos sempre garantir que nao ultrapassamos a capacidade
-        // pois a api pode dar um erro e dar que um splot esta disponivel quando na verdade nao esta
+        // 1. Validação de Capacidade (Perfeito!)
         const location = await prisma.location.findUnique({
             where: { id: data.locationId },
             include: { 
-                _count: {
-                    select: { parts: true }
-                }
+                _count: { select: { parts: true } }
             }
         });
 
@@ -49,12 +51,11 @@ export class PartsService {
             throw new Error('Localização não encontrada');
         }
 
-        // Se o número de peças atuais >= capacidade total, bloqueia.
         if (location._count.parts >= location.capacity) {
             throw new Error(`A localização ${location.fullCode} está cheia! (${location._count.parts}/${location.capacity})`);
         }
 
-        // se chegamos aq, ent podemos criar a peça
+        // 2. Criar a peça
         return prisma.part.create({
             data: {
                 name: data.name,
@@ -63,9 +64,15 @@ export class PartsService {
                 price: data.price,
                 condition: data.condition,
                 categoryId: data.categoryId,
-                locationId: data.locationId
+                locationId: data.locationId,
+                
+                // 3. NOVO: Gravar as especificações recebidas
+                // O Prisma faz um loop automático e cria as linhas na tabela PartSpecification
+                specifications: {
+                    create: data.specifications // Ex: [{ specId: 1, value: "12" }]
+                }
             },
-            include: { category: true, location: true }
+            include: { category: true, location: true, specifications: true }
         });
     }
 }
