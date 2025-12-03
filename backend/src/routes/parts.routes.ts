@@ -6,5 +6,6 @@ const router = Router();
 
 router.get("/", PartsController.getAllParts);
 router.get("/:ref", authenticate, PartsController.getPartById);
+router.post("/", authenticate, PartsController.createPart);
 
 export { router as partsRouter };

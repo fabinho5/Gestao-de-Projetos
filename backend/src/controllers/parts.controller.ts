@@ -29,5 +29,16 @@ export class PartsController {
         }
     }
 
-    
+
+    static async createPart(req: Request, res: Response) {
+        try {
+            Logger.debug('Creating part with data:', req.body);
+            const { name, refInternal, refOEM, description, price, condition, categoryId, locationId, specifications, subReferences } = req.body;
+            const part = await PartsService.createPart({ name, refInternal, refOEM, description, price, condition, categoryId, locationId, specifications, subReferences });
+            res.status(201).json(part);
+        } catch (error) {
+            Logger.error('Error creating part', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    } 
 }
