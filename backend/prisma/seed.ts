@@ -29,8 +29,8 @@ async function main() {
     },
   });
 
-  // 4. ESPECIFICAÇÕES GERAIS (O Template)
-  // Vamos criar "Voltagem" e "Amperagem"
+  // 4. ESPECIFICAÇÕES GERAIS (Globais)
+  // Criamos as especificações que podem ser usadas em qualquer peça
   const specVoltagem = await prisma.specification.create({
     data: { name: 'Voltagem', unit: 'V' }
   });
@@ -41,29 +41,20 @@ async function main() {
   
   console.log('✅ Especificações criadas');
 
-  // 5. CATEGORIA + LIGAÇÃO ÀS SPECS
-  // Criamos "Componentes Elétricos" e dizemos que aceita Voltagem e Amperagem
+  // 5. CATEGORIA (CORREÇÃO AQUI)
+  // Criamos apenas a categoria. Já NÃO ligamos specs aqui (tabela CategorySpecification foi removida).
   const catMotor = await prisma.category.create({
     data: {
       name: 'Motor',
       children: {
         create: [
-          { 
-            name: 'Componentes Elétricos',
-            // AQUI ESTÁ A MÁGICA: Ligamos as specs à categoria
-            allowedSpecs: {
-              create: [
-                { specId: specVoltagem.id },
-                { specId: specAmperagem.id }
-              ]
-            }
-          }
+          { name: 'Componentes Elétricos' } // <--- Simples, sem allowedSpecs
         ]
       }
     }
   });
 
-  console.log('✅ Categorias criadas com regras de especificação');
+  console.log('✅ Categorias criadas');
 
   // 6. BUSCAR OS IDs PARA CRIAR A PEÇA
   const subCat = await prisma.category.findFirst({ 
@@ -74,6 +65,7 @@ async function main() {
   });
 
   // 7. CRIAR PEÇA COM VALORES REAIS
+  // Aqui dizemos: "ESTA peça específica tem 12V e 150A"
   if (subCat && loc) {
     await prisma.part.create({
       data: {
@@ -86,8 +78,8 @@ async function main() {
         // PREENCHER OS VALORES DAS ESPECIFICAÇÕES
         specifications: {
           create: [
-            { specId: specVoltagem.id, value: '12' },   // 12 V
-            { specId: specAmperagem.id, value: '150' }  // 150 A
+            { specId: specVoltagem.id, value: '12' },   // Valor: 12
+            { specId: specAmperagem.id, value: '150' }  // Valor: 150
           ]
         }
       }

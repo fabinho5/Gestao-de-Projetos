@@ -71,9 +71,7 @@ model Category {
   
   parts     Part[]
   
-  // --- NOVA RELAÇÃO ---
-  // Uma categoria define quais especificações são permitidas nela
-  allowedSpecs CategorySpecification[]
+  // REMOVIDO: allowedSpecs (já não há restrição por categoria)
 
   deletedAt DateTime?  @map("deleted_at")
 
@@ -115,7 +113,7 @@ model Part {
 
   images         PartImage[]
   
-  // Aqui guardamos os VALORES (ex: "150.000")
+  // A peça pode ter N especificações, quaisquer que sejam
   specifications PartSpecification[] 
   
   movements      StockMovement[]
@@ -135,38 +133,24 @@ model PartImage {
   @@map("part_images")
 }
 
-// DEFINIÇÃO DA ESPECIFICAÇÃO (O NOME)
-// Ex: Nome="Quilómetros", Unit="km"
+// LISTA GLOBAL DE ESPECIFICAÇÕES POSSÍVEIS
+// Ex: "Voltagem", "Cor", "Peso", "Lado de Montagem"
 model Specification {
   id        Int                 @id @default(autoincrement())
   name      String              
   unit      String?             
   
-  // Relações
-  categories CategorySpecification[] // Usada nestas categorias
-  values     PartSpecification[]     // Tem estes valores nas peças
+  // REMOVIDO: categories (já não está presa a categorias)
+  
+  values    PartSpecification[] // As peças que usam esta spec
 
   @@map("specifications")
 }
 
-// --- NOVA TABELA ---
-// Liga a Categoria à Especificação (O Template)
-// Diz: "A categoria Motores TEM o campo Quilómetros"
-model CategorySpecification {
-  id         Int @id @default(autoincrement())
-  categoryId Int @map("category_id")
-  specId     Int @map("spec_id")
+// REMOVIDA A TABELA: CategorySpecification
 
-  category   Category      @relation(fields: [categoryId], references: [id])
-  spec       Specification @relation(fields: [specId], references: [id])
-
-  @@unique([categoryId, specId]) // Não podes adicionar a mesma spec duas vezes à mesma categoria
-  @@map("category_specifications")
-}
-
-// VALOR DA ESPECIFICAÇÃO
-// Liga a Peça à Especificação com um VALOR
-// Diz: "O Motor X tem 150.000 no campo Quilómetros"
+// LIGAÇÃO PEÇA -> ESPECIFICAÇÃO
+// "Esta peça específica tem este valor para esta spec"
 model PartSpecification {
   partId    Int           @map("part_id")
   specId    Int           @map("spec_id")
@@ -203,20 +187,14 @@ model Location {
   pallet      String?   
   fullCode    String    @unique @map("full_code") 
 
-  // --- NOVA FUNCIONALIDADE: SLOTS ---
-  // Define quantas peças cabem aqui. Ex: Uma prateleira pode ter capacidade 5.
   capacity    Int       @default(1) 
 
-  // Relação inversa: Uma localização tem VÁRIAS peças
   parts       Part[]
-
   movementsFrom StockMovement[] @relation("SourceLocation")
   movementsTo   StockMovement[] @relation("DestLocation")
 
   @@map("locations")
 }
-
-// APAGUEI A TABELA PartLocation (Já não é necessária)
 
 // --------------------------------------
 // 4. MÓDULO OPERAÇÕES
@@ -249,8 +227,6 @@ model ReservationItem {
   id            Int         @id @default(autoincrement())
   reservationId Int         @map("reservation_id")
   partId        Int         @map("part_id")
-  // Quantity removido? Não, mantém-se 1, mas pode ficar se quiseres reservar 
-  // múltiplas peças diferentes num futuro pack.
   quantity      Int         @default(1)
   
   reservation   Reservation @relation(fields: [reservationId], references: [id])
@@ -272,8 +248,6 @@ model StockMovement {
   partId      Int          @map("part_id")
   userId      Int          @map("user_id")
   type        MovementType
-  
-  // quantity removida porque a peça é única (é sempre 1)
   
   sourceLocId Int?         @map("source_location_id")
   destLocId   Int?         @map("dest_location_id")
