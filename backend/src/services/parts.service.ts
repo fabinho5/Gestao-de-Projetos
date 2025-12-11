@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { PartCondition } from '@prisma/client';
 
 export class PartsService {
     
@@ -29,14 +30,15 @@ export class PartsService {
 
     static async createPart(data: { 
         name: string; 
-        refInternal: string; 
+        refInternal: string;
+        refOEM?: string;
         description?: string; 
         price: number; 
         condition: string; 
         categoryId: number;
         locationId: number;
-        // NOVO: Receber as specs (opcional), maybe no futuro isto vai passar a ser obrigatório, tenho de ver com o fabio ainda
         specifications?: { specId: number; value: string }[];
+        subReferences?: string[];
     }) {
     
         // verificamos a capacidade
@@ -61,19 +63,31 @@ export class PartsService {
             data: {
                 name: data.name,
                 refInternal: data.refInternal,
+                refOEM: data.refOEM,
                 description: data.description,
                 price: data.price,
-                condition: data.condition,
+                condition: data.condition as PartCondition, 
+                
                 categoryId: data.categoryId,
                 locationId: data.locationId,
                 
-                // NOVO: Gravar as especificações recebidas
-                // O Prisma faz um loop automático e cria as linhas na tabela PartSpecification
                 specifications: {
-                    create: data.specifications // Ex: [{ specId: 1, value: "12" }]
+                    create: data.specifications
+                },
+
+                // <--- NOVO: Gravar Sub-Referências
+                // Transforma ["REF1", "REF2"] em [{ value: "REF1" }, { value: "REF2" }]
+                subReferences: {
+                    create: data.subReferences?.map(ref => ({ value: ref }))
                 }
             },
-            include: { category: true, location: true, specifications: true }
+            include: { 
+                category: true, 
+                location: true, 
+                specifications: { include: { spec: true } },
+                subReferences: true,
+                images: true
+            }
         });
     }
 }

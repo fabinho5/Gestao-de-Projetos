@@ -123,10 +123,9 @@ model Part {
   deletedAt   DateTime? @map("deleted_at")
 
   images         PartImage[]
-  
+  reservations   Reservation[]
   subReferences  PartReference[]
   specifications PartSpecification[] 
-  
   movements      StockMovement[]
   favoritedBy    UserFavorite[]
 
@@ -234,6 +233,7 @@ model Reservation {
   userId      Int               @map("user_id")
   user        User              @relation(fields: [userId], references: [id])
   partId      Int              @map("part_id")
+  part        Part              @relation(fields: [partId], references: [id])
   status      ReservationStatus @default(PENDING)
   notes       String?
   createdAt   DateTime          @default(now()) @map("created_at")
