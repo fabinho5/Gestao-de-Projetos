@@ -29,55 +29,16 @@ export class PartsController {
         }
     }
 
+
     static async createPart(req: Request, res: Response) {
         try {
             Logger.debug('Creating part with data:', req.body);
-            
-            // 1. Desestruturar
-            const { 
-                name, refInternal, refOEM, description, price, condition, 
-                categoryId, locationId, specifications, subReferences 
-            } = req.body;
-
-            // 2. Validação de Campos Obrigatórios
-            if (!name || !refInternal || !price || !categoryId || !locationId) {
-                return res.status(400).json({ 
-                    message: 'Dados inválidos. Campos obrigatórios: name, refInternal, price, categoryId, locationId' 
-                });
-            }
-
-            // 3. Conversão e Chamada ao Service
-            const part = await PartsService.createPart({ 
-                name, 
-                refInternal, 
-                refOEM, 
-                description, 
-                price: Number(price),      
-                categoryId: Number(categoryId), 
-                locationId: Number(locationId), 
-                condition: condition || 'USED',
-                specifications, 
-                subReferences,
-                userId: req.user?.id || 0 
-            });
-
-            Logger.info(`Peça criada com sucesso: ${part.refInternal} (ID: ${part.id})`);
+            const { name, refInternal, refOEM, description, price, condition, categoryId, locationId, specifications, subReferences } = req.body;
+            const part = await PartsService.createPart({ name, refInternal, refOEM, description, price, condition, categoryId, locationId, specifications, subReferences });
             res.status(201).json(part);
-
-        } catch (error: any) {
+        } catch (error) {
             Logger.error('Error creating part', error);
-
-            // P2002: Unique constraint failed (Referência duplicada)
-            if (error.code === 'P2002') {
-                return res.status(409).json({ message: 'Essa Referência Interna já existe no sistema.' });
-            }
-
-            // Erro de Capacidade (lançado pelo nosso Service)
-            if (error.message && error.message.includes('está cheia')) {
-                return res.status(400).json({ message: error.message });
-            }
-
             res.status(500).json({ message: 'Internal server error' });
         }
-    }
+    } 
 }

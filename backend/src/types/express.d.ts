@@ -7,7 +7,7 @@ declare global {
     interface Request {
       user?: {
         id: number;
-        userName: string;
+        username: string;
         role: UserRole; // Usa o Enum do Prisma (ADMIN, SALES, etc.)
       };
     }
