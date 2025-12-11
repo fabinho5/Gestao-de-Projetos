@@ -1,11 +1,24 @@
-import { Router } from "express";
-import { PartsController } from "../controllers/parts.controller.js";
-import { authenticate } from "../middlewares/auth.middleware.js";
+import { Router } from 'express';
+import { PartsController } from '../controllers/parts.controller.js';
+import { authenticate } from '../middlewares/auth.middleware.js';
+import { requireRole } from '../middlewares/roles.middleware.js';
+import { UserRole } from '@prisma/client';
 
 const router = Router();
 
-router.get("/", PartsController.getAllParts);
-router.get("/:ref", authenticate, PartsController.getPartById);
-router.post("/", authenticate, PartsController.createPart);
+// Qualquer utilizador autenticado pode ver peças
+router.get(
+  '/',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.getAllParts
+);
+
+router.get(
+  '/:ref',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.getPartById
+);
 
 export { router as partsRouter };
