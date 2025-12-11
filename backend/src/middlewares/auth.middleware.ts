@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env.js';
-import jwt, { TokenExpiredError } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { Logger } from '../utils/logger.js';
 import { UserRole } from '@prisma/client';  
 import { prisma } from '../lib/prisma.js';
@@ -26,7 +26,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
     } catch (error: any) {
         
-        if (error instanceof TokenExpiredError) {
+        if (error instanceof jwt.TokenExpiredError) {
             Logger.warn("Access token expired");
             return res.status(401).json({ message: "ACCESS_TOKEN_EXPIRED" }); 
         }
