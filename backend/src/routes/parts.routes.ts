@@ -21,4 +21,6 @@ router.get(
   PartsController.getPartById
 );
 
+router.post("/", authenticate, PartsController.createPart);
+
 export { router as partsRouter };

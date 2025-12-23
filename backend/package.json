@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "test:db": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' src/test-connections.ts",
+    "test:db": "tsx src/test-connections.ts",
     "dev": "tsx src/server.ts"
   },
   "keywords": [],
@@ -35,6 +35,6 @@
     "typescript": "^5.9.3"
   },
   "prisma": {
-    "seed": "node --no-warnings --loader ts-node/esm prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
   }
 }

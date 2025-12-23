@@ -12,7 +12,7 @@ async function main() {
   await prisma.user.upsert({
     where: { email: 'admin@fundapecas.pt' },
     update: {},
-    create: { email: 'admin@fundapecas.pt', fullName: 'Sr. Administrador', passwordHash, role: 'ADMIN' },
+    create: { username: 'admin', email: 'admin@fundapecas.pt', fullName: 'Sr. Administrador', passwordHash, role: 'ADMIN' },
   });
 
   // 3. ARMAZÉM (W01) COM CAPACIDADE
