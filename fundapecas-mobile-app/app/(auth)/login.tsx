@@ -30,7 +30,7 @@ export default function LoginScreen() {
         setLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3000/auth/login', {
+            const response = await fetch('http://localhost:3002/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -89,21 +89,20 @@ export default function LoginScreen() {
                             {/* Username/Email Input */}
                             <View className="mb-4">
                                 <Text className="text-sm font-medium text-gray-700 mb-2">
-                                    Email
+                                    Username
                                 </Text>
                                 <View className="flex-row items-center bg-blue-50 rounded-xl px-4 py-3 border border-blue-100">
-                                    <Ionicons name="mail-outline" size={20} color="#3b82f6" />
-                                    <TextInput
-                                        className="flex-1 ml-3 text-base text-gray-800"
-                                        placeholder="Introduz o teu email"
-                                        placeholderTextColor="#9ca3af"
-                                        keyboardType="email-address"
-                                        autoCapitalize="none"
-                                        value={username}
-                                        onChangeText={setUsername}
-                                        editable={!loading}
-                                    />
-                                </View>
+                                  <Ionicons name="person-outline" size={20} color="#3b82f6" />
+                                  <TextInput
+                                      className="flex-1 ml-3 text-base text-gray-800"
+                                      placeholder="Introduz o teu username"
+                                      placeholderTextColor="#9ca3af"
+                                      autoCapitalize="none"
+                                      value={username}
+                                      onChangeText={setUsername}
+                                      editable={!loading}
+                                  />
+                              </View>
                             </View>
 
                             {/* Password Input */}
