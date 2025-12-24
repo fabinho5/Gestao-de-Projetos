@@ -151,18 +151,7 @@ export default function LoginScreen() {
                                     </Text>
                                 )}
                             </TouchableOpacity>
-
-                            {/* Create Account Link */}
-                            <View className="flex-row justify-center items-center">
-                                <TouchableOpacity
-                                    onPress={() => router.push("/(auth)/createUser")}
-                                    disabled={loading}
-                                >
-                                    <Text className="text-blue-600 text-sm font-semibold">
-                                        Criar conta
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
+                            
                         </View>
                     </View>
                 </ScrollView>
