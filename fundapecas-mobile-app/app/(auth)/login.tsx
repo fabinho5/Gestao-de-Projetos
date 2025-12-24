@@ -4,7 +4,6 @@ import {
     TextInput, 
     TouchableOpacity, 
     View, 
-    Alert,
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
@@ -15,22 +14,31 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
+// Configuração da API
+const API_URL = 'http://localhost:3002';
+
 export default function LoginScreen() {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
+    const [successMessage, setSuccessMessage] = useState("");
 
     const handleLogin = async () => {
+        // Limpa mensagens anteriores
+        setErrorMessage("");
+        setSuccessMessage("");
+
         if (!username || !password) {
-            Alert.alert("Erro", "Por favor preenche todos os campos.");
+            setErrorMessage("Por favor preencha todos os campos.");
             return;
         }
 
         setLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3000/auth/login', {
+            const response = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -44,13 +52,16 @@ export default function LoginScreen() {
             const data = await response.json();
 
             if (response.ok) {
-                Alert.alert("Sucesso", `Bem-vindo, ${data.user.fullName}!`);
-                router.push("/home");
+                setSuccessMessage(`Bem-vindo, ${data.user.fullName}!`);
+                
+                setTimeout(() => {
+                    router.push("/home");
+                }, 1500);
             } else {
-                Alert.alert("Erro", data.message || "Credenciais inválidas");
+                setErrorMessage("Credenciais inválidas. Verifique os seus dados.");
             }
         } catch (error) {
-            Alert.alert("Erro", "Não foi possível conectar ao servidor");
+            setErrorMessage("Erro de conexão. Verifique se o servidor está ativo.");
             console.error(error);
         } finally {
             setLoading(false);
@@ -86,18 +97,17 @@ export default function LoginScreen() {
 
                         {/* Form */}
                         <View className="w-full max-w-sm">
-                            {/* Username/Email Input */}
+                            {/* Username Input */}
                             <View className="mb-4">
                                 <Text className="text-sm font-medium text-gray-700 mb-2">
-                                    Email
+                                    Username
                                 </Text>
                                 <View className="flex-row items-center bg-blue-50 rounded-xl px-4 py-3 border border-blue-100">
-                                    <Ionicons name="mail-outline" size={20} color="#3b82f6" />
+                                    <Ionicons name="person-outline" size={20} color="#3b82f6" />
                                     <TextInput
                                         className="flex-1 ml-3 text-base text-gray-800"
-                                        placeholder="Introduz o teu email"
+                                        placeholder="Introduz o teu username"
                                         placeholderTextColor="#9ca3af"
-                                        keyboardType="email-address"
                                         autoCapitalize="none"
                                         value={username}
                                         onChangeText={setUsername}
@@ -135,11 +145,31 @@ export default function LoginScreen() {
                                 </View>
                             </View>
 
+                            {/* Mensagem de Erro */}
+                            {errorMessage ? (
+                                <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex-row items-center">
+                                    <Ionicons name="alert-circle-outline" size={20} color="#dc2626" />
+                                    <Text className="text-red-600 text-sm ml-2 flex-1">
+                                        {errorMessage}
+                                    </Text>
+                                </View>
+                            ) : null}
+
+                            {/* Mensagem de Sucesso */}
+                            {successMessage ? (
+                                <View className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4 flex-row items-center">
+                                    <Ionicons name="checkmark-circle-outline" size={20} color="#16a34a" />
+                                    <Text className="text-green-600 text-sm ml-2 flex-1">
+                                        {successMessage}
+                                    </Text>
+                                </View>
+                            ) : null}
+
                             {/* Login Button */}
                             <TouchableOpacity
                                 onPress={handleLogin}
                                 disabled={loading}
-                                className={`bg-blue-600 rounded-xl py-4 items-center shadow-sm mb-4 ${
+                                className={`bg-blue-600 rounded-xl py-4 items-center shadow-sm ${
                                     loading ? 'opacity-70' : ''
                                 }`}
                             >
@@ -151,7 +181,6 @@ export default function LoginScreen() {
                                     </Text>
                                 )}
                             </TouchableOpacity>
-                            
                         </View>
                     </View>
                 </ScrollView>
