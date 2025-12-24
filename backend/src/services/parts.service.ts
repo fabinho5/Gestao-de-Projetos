@@ -1,6 +1,9 @@
 import { prisma } from '../lib/prisma.js';
 import { PartCondition } from '@prisma/client';
 
+export class NotFoundError extends Error {}
+export class ConflictError extends Error {}
+
 export class PartsService {
     
     static async getAllParts() {
@@ -31,10 +34,10 @@ export class PartsService {
     static async createPart(data: { 
         name: string; 
         refInternal: string;
-        refOEM?: string;
-        description?: string; 
+        refOEM?: string | null;
+        description?: string | null; 
         price: number; 
-        condition: string; 
+        condition: PartCondition; 
         categoryId: number;
         locationId: number;
         specifications?: { specId: number; value: string }[];
@@ -50,11 +53,11 @@ export class PartsService {
         });
 
         if (!location) {
-            throw new Error('Localização não encontrada');
+            throw new NotFoundError('Location not found');
         }
 
         if (location._count.parts >= location.capacity) {
-            throw new Error(`A localização ${location.fullCode} está cheia! (${location._count.parts}/${location.capacity})`);
+            throw new ConflictError(`Location ${location.fullCode} is full (${location._count.parts}/${location.capacity})`);
         }
 
         
@@ -66,7 +69,7 @@ export class PartsService {
                 refOEM: data.refOEM,
                 description: data.description,
                 price: data.price,
-                condition: data.condition as PartCondition, 
+                condition: data.condition,
                 
                 categoryId: data.categoryId,
                 locationId: data.locationId,
