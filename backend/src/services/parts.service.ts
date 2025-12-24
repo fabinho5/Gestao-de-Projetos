@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { PartCondition } from '@prisma/client';
+import { stockMovementService } from './stockMovement.service.js';
 
 export class NotFoundError extends Error {}
 export class ConflictError extends Error {}
@@ -42,7 +43,7 @@ export class PartsService {
         locationId: number;
         specifications?: { specId: number; value: string }[];
         subReferences?: string[];
-    }) {
+    }, createdByUserId: number) {
     
         // verificamos a capacidade
         const location = await prisma.location.findUnique({
@@ -62,7 +63,7 @@ export class PartsService {
 
         
         // se cheganmos aqui, é porque está tudo ok
-        return prisma.part.create({
+        const part = await prisma.part.create({
             data: {
                 name: data.name,
                 refInternal: data.refInternal,
@@ -92,5 +93,10 @@ export class PartsService {
                 images: true
             }
         });
+
+        // Registar movimento de ENTRY
+        await stockMovementService.recordEntry(part.id, createdByUserId, data.locationId);
+
+        return part;
     }
 }

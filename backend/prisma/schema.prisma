@@ -49,10 +49,11 @@ model User {
   refreshToken String? @map("refresh_token")
 
   
-  movements    StockMovement[]
-  logs         AuditLog[]
-  reservations Reservation[]
-  favorites    UserFavorite[]
+  movements            StockMovement[]
+  logs                 AuditLog[]
+  createdReservations  Reservation[] @relation("CreatedReservations")  // Reservas criadas (SALES)
+  assignedReservations Reservation[] @relation("AssignedReservations") // Reservas assumidas (WAREHOUSE)
+  favorites            UserFavorite[]
 
   @@map("users")
 }
@@ -208,9 +209,10 @@ model Location {
 
   capacity    Int       @default(1) 
 
-  parts       Part[]
+  parts         Part[]
   movementsFrom StockMovement[] @relation("SourceLocation")
   movementsTo   StockMovement[] @relation("DestLocation")
+  returnedReservations Reservation[]
 
   @@map("locations")
 }
@@ -221,23 +223,45 @@ model Location {
 
 enum ReservationStatus {
   PENDING
-  CONFIRMED
   IN_PREPARATION
   READY_TO_SHIP
   COMPLETED
+  CONFIRMED
   CANCELLED
 }
 
+enum CancelReason {
+  DESIST          // Cliente desistiu (antes de COMPLETED)
+  RETURN          // Devolução normal (peça volta ao stock)
+  DAMAGED_RETURN  // Devolução com peça danificada
+}
+
 model Reservation {
-  id          Int               @id @default(autoincrement())
-  userId      Int               @map("user_id")
-  user        User              @relation(fields: [userId], references: [id])
-  partId      Int              @map("part_id")
-  part        Part              @relation(fields: [partId], references: [id])
-  status      ReservationStatus @default(PENDING)
-  notes       String?
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
+  id            Int               @id @default(autoincrement())
+  
+  // Quem criou a reserva (SALES)
+  userId        Int               @map("user_id")
+  user          User              @relation("CreatedReservations", fields: [userId], references: [id])
+  
+  // Peça reservada
+  partId        Int               @map("part_id")
+  part          Part              @relation(fields: [partId], references: [id])
+  
+  // Quem assumiu a preparação (WAREHOUSE) - null até alguém assumir
+  assignedToId  Int?              @map("assigned_to_id")
+  assignedTo    User?             @relation("AssignedReservations", fields: [assignedToId], references: [id])
+  
+  status        ReservationStatus @default(PENDING)
+  notes         String?
+  
+  // Campos de cancelamento
+  cancelReason      CancelReason? @map("cancel_reason")
+  cancelledAt       DateTime?     @map("cancelled_at")
+  returnLocationId  Int?          @map("return_location_id")
+  returnLocation    Location?     @relation(fields: [returnLocationId], references: [id])
+  
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
 
   @@map("reservations")
 }
