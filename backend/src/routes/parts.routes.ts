@@ -21,6 +21,11 @@ router.get(
   PartsController.getPartById
 );
 
-router.post("/", authenticate, PartsController.createPart);
+router.post(
+  "/",
+  authenticate,
+  requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
+  PartsController.createPart
+);
 
 export { router as partsRouter };

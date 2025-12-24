@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { PartCondition } from '@prisma/client';
+import { PartCondition, Prisma } from '@prisma/client';
 
 export class NotFoundError extends Error {}
 export class ConflictError extends Error {}
@@ -62,35 +62,42 @@ export class PartsService {
 
         
         // se cheganmos aqui, é porque está tudo ok
-        return prisma.part.create({
-            data: {
-                name: data.name,
-                refInternal: data.refInternal,
-                refOEM: data.refOEM,
-                description: data.description,
-                price: data.price,
-                condition: data.condition,
-                
-                categoryId: data.categoryId,
-                locationId: data.locationId,
-                
-                specifications: {
-                    create: data.specifications
-                },
+        try {
+            return await prisma.part.create({
+                data: {
+                    name: data.name,
+                    refInternal: data.refInternal,
+                    refOEM: data.refOEM,
+                    description: data.description,
+                    price: data.price,
+                    condition: data.condition,
+                    
+                    categoryId: data.categoryId,
+                    locationId: data.locationId,
+                    
+                    specifications: {
+                        create: data.specifications
+                    },
 
-                // <--- NOVO: Gravar Sub-Referências
-                // Transforma ["REF1", "REF2"] em [{ value: "REF1" }, { value: "REF2" }]
-                subReferences: {
-                    create: data.subReferences?.map(ref => ({ value: ref }))
+                    // <--- NOVO: Gravar Sub-Referências
+                    // Transforma ["REF1", "REF2"] em [{ value: "REF1" }, { value: "REF2" }]
+                    subReferences: {
+                        create: data.subReferences?.map(ref => ({ value: ref }))
+                    }
+                },
+                include: { 
+                    category: true, 
+                    location: true, 
+                    specifications: { include: { spec: true } },
+                    subReferences: true,
+                    images: true
                 }
-            },
-            include: { 
-                category: true, 
-                location: true, 
-                specifications: { include: { spec: true } },
-                subReferences: true,
-                images: true
+            });
+        } catch (error: any) {
+            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+                throw new ConflictError('Part refInternal already exists');
             }
-        });
+            throw error;
+        }
     }
 }
