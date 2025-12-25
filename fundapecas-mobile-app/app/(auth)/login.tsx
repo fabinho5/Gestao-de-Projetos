@@ -44,14 +44,30 @@ export default function LoginScreen() {
             // Mostra mensagem de sucesso
             setSuccessMessage(`Bem-vindo, ${response.user?.fullName || username}!`);
             
-            // Redireciona após 1.5 segundos
+            // Limpa os campos
+            setUsername("");
+            setPassword("");
+            
+            // Redireciona após 800ms
             setTimeout(() => {
-                router.push("/home");
-            }, 1500);
+                router.replace("/home");
+            }, 800);
         } catch (error) {
             // Tratamento de erro
             const apiError = error as ApiError;
-            setErrorMessage("Credenciais inválidas.");
+            console.error("Erro de login:", apiError);
+            
+            // Limpa a password por segurança
+            setPassword("");
+            
+            // Define mensagem de erro apropriada
+            if (apiError.statusCode === 401) {
+                setErrorMessage("Username ou password incorretos.");
+            } else if (apiError.statusCode === 0) {
+                setErrorMessage("Erro de conexão. Verifica se o servidor está ativo.");
+            } else {
+                setErrorMessage(apiError.message || "Erro ao fazer login. Tenta novamente.");
+            }
         } finally {
             setLoading(false);
         }
@@ -99,7 +115,12 @@ export default function LoginScreen() {
                                         placeholderTextColor="#9ca3af"
                                         autoCapitalize="none"
                                         value={username}
-                                        onChangeText={setUsername}
+                                        onChangeText={(text) => {
+                                            setUsername(text);
+                                            // Limpa mensagens ao digitar
+                                            setErrorMessage("");
+                                            setSuccessMessage("");
+                                        }}
                                         editable={!loading}
                                     />
                                 </View>
@@ -118,7 +139,13 @@ export default function LoginScreen() {
                                         placeholderTextColor="#9ca3af"
                                         secureTextEntry={!showPassword}
                                         value={password}
-                                        onChangeText={setPassword}
+                                        onChangeText={(text) => {
+                                            setPassword(text);
+                                            // Limpa mensagens ao digitar
+                                            setErrorMessage("");
+                                            setSuccessMessage("");
+                                        }}
+                                        onSubmitEditing={handleLogin}
                                         editable={!loading}
                                     />
                                     <TouchableOpacity

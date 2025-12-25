@@ -86,7 +86,7 @@ export const validateLoginFields = (
     if (!username || !password) {
         return {
             valid: false,
-            message: 'Por favor preencha todos os campos',
+            message: 'Por favor preencha todos os campos.',
         };
     }
     
