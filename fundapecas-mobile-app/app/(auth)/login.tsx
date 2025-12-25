@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuração da API
 const API_URL = 'http://localhost:3002';
@@ -52,7 +53,25 @@ export default function LoginScreen() {
             const data = await response.json();
 
             if (response.ok) {
-                setSuccessMessage(`Bem-vindo, ${data.user.fullName}!`);
+                // Verificar se existe token na resposta
+                const token = data.token || data.accessToken || data.access_token;
+                
+                if (!token) {
+                    console.error('ERRO: Token não encontrado na resposta do backend!');
+                    console.log('Estrutura da resposta:', Object.keys(data));
+                    setErrorMessage("Erro: Token não recebido do servidor.");
+                    return;
+                }
+
+                // Guardar token no AsyncStorage
+                await AsyncStorage.setItem('userToken', token);
+                console.log('Token guardado com sucesso:', token.substring(0, 20) + '...');
+                
+                // Verificar se foi mesmo guardado
+                const savedToken = await AsyncStorage.getItem('userToken');
+                console.log('Token verificado:', savedToken ? 'Existe' : 'Não existe');
+                
+                setSuccessMessage(`Bem-vindo, ${data.user?.fullName || username}!`);
                 
                 setTimeout(() => {
                     router.push("/home");
@@ -62,7 +81,7 @@ export default function LoginScreen() {
             }
         } catch (error) {
             setErrorMessage("Erro de conexão. Verifique se o servidor está ativo.");
-            console.error(error);
+            console.error('Erro no login:', error);
         } finally {
             setLoading(false);
         }

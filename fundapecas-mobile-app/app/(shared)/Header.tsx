@@ -47,20 +47,23 @@ export default function Header({
         contentFit="contain"
       />
 
-      {/* Right - Profile Icon */}
-      <TouchableOpacity 
-        onPress={() => {
-          console.log("Ícone clicado");
-          setMenuVisible(true);
-        }}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name="person-circle-outline"
-          size={36}
-          color="#3b82f6"
-        />
-      </TouchableOpacity>
+      {/* Right - Actions */}
+      <View style={styles.actionsContainer}>
+
+        <TouchableOpacity 
+          onPress={() => {
+            console.log("Ícone clicado");
+            setMenuVisible(true);
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="person-circle-outline"
+            size={36}
+            color="#3b82f6"
+          />
+        </TouchableOpacity>
+      </View>
 
       {/* Dropdown Menu */}
       <Modal
@@ -92,9 +95,12 @@ export default function Header({
               onPress={handleLogout}
               activeOpacity={0.7}
             >
-              <Text style={[styles.menuText, styles.logout]}>
-                Logout
-              </Text>
+              <View style={styles.menuItemContent}>
+                <Ionicons name="log-out-outline" size={18} color="#D32F2F" />
+                <Text style={[styles.menuText, styles.logout]}>
+                  Logout
+                </Text>
+              </View>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -120,6 +126,14 @@ const styles = StyleSheet.create({
     height: 40,
     width: 120,
   },
+  actionsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  logoutButton: {
+    padding: 4,
+  },
   overlay: {
     flex: 1,
     alignItems: "flex-end",
@@ -140,6 +154,11 @@ const styles = StyleSheet.create({
   menuItem: {
     paddingVertical: 12,
     paddingHorizontal: 16,
+  },
+  menuItemContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   menuText: {
     fontSize: 16,
