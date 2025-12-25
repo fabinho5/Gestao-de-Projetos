@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../(shared)/Header';
 import SearchBar from '../(shared)/SearchBar';
 import {
@@ -24,12 +26,8 @@ import {
     ApiError,
 } from '../(services)/partsService';
 
-type PartsProps = {
-    onProfilePress: () => void;
-    onLogoutPress: () => void;
-};
-
-const Parts = ({ onProfilePress, onLogoutPress }: PartsProps) => {
+const Parts = () => {
+    const router = useRouter();
     const [allParts, setAllParts] = useState<Part[]>([]);
     const [paginatedData, setPaginatedData] = useState<PaginatedParts>({
         parts: [],
@@ -93,6 +91,20 @@ const Parts = ({ onProfilePress, onLogoutPress }: PartsProps) => {
 
     const goToPage = (page: number) => {
         updatePagination(searchQuery, page);
+    };
+
+    const handleProfilePress = () => {
+        router.push('/profile');
+    };
+
+    const handleLogoutPress = async () => {
+        try {
+            await AsyncStorage.removeItem('userToken');
+            router.replace('/login');
+        } catch (error) {
+            console.error('Erro ao fazer logout:', error);
+            Alert.alert('Erro', 'Não foi possível fazer logout');
+        }
     };
 
     const renderPartCard = ({ item: part }: { item: Part }) => (
@@ -162,11 +174,11 @@ const Parts = ({ onProfilePress, onLogoutPress }: PartsProps) => {
             }
         } else {
             pages.push(1);
-            if (currentPage > 3) pages.push(-1); 
+            if (currentPage > 3) pages.push(-1); // -1 representa "..."
             for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
                 pages.push(i);
             }
-            if (currentPage < totalPages - 2) pages.push(-2); 
+            if (currentPage < totalPages - 2) pages.push(-2); // -2 representa "..."
             pages.push(totalPages);
         }
 
@@ -231,7 +243,7 @@ const Parts = ({ onProfilePress, onLogoutPress }: PartsProps) => {
 
     return (
         <View style={styles.container}>
-            <Header onProfilePress={onProfilePress} onLogoutPress={onLogoutPress} />
+            <Header onProfilePress={handleProfilePress} onLogoutPress={handleLogoutPress} />
             
             <SearchBar
                 placeholder="Pesquisar peças..."
