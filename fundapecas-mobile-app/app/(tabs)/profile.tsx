@@ -10,16 +10,26 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_URL = 'http://localhost:3002';
+import { 
+    getProfile, 
+    changePassword, 
+    validatePassword,
+    validatePasswordMatch,
+    validatePasswordFields,
+    getRoleName,
+    formatDate,
+    ApiError,
+    UserProfile 
+} from "../(services)/profileService";
+import { logout } from "../(services)/authService";
 
 export default function ProfileScreen() {
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
     
     // Dados do perfil
-    const [profile, setProfile] = useState({
+    const [profile, setProfile] = useState<UserProfile>({
+        id: "",
         username: "",
         email: "",
         fullName: "",
@@ -45,37 +55,16 @@ export default function ProfileScreen() {
 
     const loadProfile = async () => {
         try {
-            // Buscar token do AsyncStorage
-            const token = await AsyncStorage.getItem('userToken');
-            
-            if (!token) {
-                setErrorMessage("Token não encontrado. Faça login novamente.");
-                setTimeout(() => router.replace("/(auth)/login"), 2000);
-                return;
-            }
-
-            const response = await fetch(`${API_URL}/auth/me`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setProfile(data);
-            } else {
-                if (response.status === 401) {
-                    setErrorMessage("Sessão expirada. Faça login novamente.");
-                    await AsyncStorage.removeItem('userToken');
-                    setTimeout(() => router.replace("/(auth)/login"), 2000);
-                } else {
-                    setErrorMessage("Erro ao carregar perfil");
-                }
-            }
+            const data = await getProfile();
+            setProfile(data);
         } catch (error) {
-            setErrorMessage("Erro de conexão. Verifique se o backend está rodando.");
-            console.error(error);
+            const apiError = error as ApiError;
+            setErrorMessage(apiError.message);
+            
+            // Se for erro 401, redireciona para login
+            if (apiError.statusCode === 401) {
+                setTimeout(() => router.replace("/(auth)/login"), 2000);
+            }
         } finally {
             setLoading(false);
         }
@@ -85,82 +74,45 @@ export default function ProfileScreen() {
         setErrorMessage("");
         setSuccessMessage("");
 
-        // Validações
-        if (!oldPassword || !newPassword || !confirmPassword) {
-            setErrorMessage("Preencha todos os campos");
+        // Validação 1: Verificar se todos os campos estão preenchidos
+        const fieldsValidation = validatePasswordFields(oldPassword, newPassword, confirmPassword);
+        if (!fieldsValidation.valid) {
+            setErrorMessage(fieldsValidation.message!);
             return;
         }
 
-        if (newPassword !== confirmPassword) {
-            setErrorMessage("As passwords não coincidem");
+        // Validação 2: Verificar se as passwords coincidem
+        const matchValidation = validatePasswordMatch(newPassword, confirmPassword);
+        if (!matchValidation.valid) {
+            setErrorMessage(matchValidation.message!);
             return;
         }
 
-        if (newPassword.length < 6) {
-            setErrorMessage("A nova password deve ter no mínimo 6 caracteres");
-            return;
-        }
-
-        // Validações de força da password
-        if (!/[a-z]/.test(newPassword)) {
-            setErrorMessage("Password deve conter pelo menos uma letra minúscula");
-            return;
-        }
-
-        if (!/[A-Z]/.test(newPassword)) {
-            setErrorMessage("Password deve conter pelo menos uma letra maiúscula");
-            return;
-        }
-
-        if (!/[0-9]/.test(newPassword)) {
-            setErrorMessage("Password deve conter pelo menos um número");
+        // Validação 3: Verificar força da password
+        const passwordValidation = validatePassword(newPassword);
+        if (!passwordValidation.valid) {
+            setErrorMessage(passwordValidation.message!);
             return;
         }
 
         setUpdating(true);
 
         try {
-            // Buscar token do AsyncStorage
-            const token = await AsyncStorage.getItem('userToken');
-
-            if (!token) {
-                setErrorMessage("Token não encontrado. Faça login novamente.");
-                setTimeout(() => router.replace("/(auth)/login"), 2000);
-                return;
-            }
-
-            const response = await fetch(`${API_URL}/auth/change-password`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    oldPassword,
-                    newPassword,
-                }),
-            });
-
-            if (response.ok) {
-                setSuccessMessage("Password alterada com sucesso!");
-                setOldPassword("");
-                setNewPassword("");
-                setConfirmPassword("");
-                setShowPasswordForm(false);
-                
-                // Remove token e faz logout
-                await AsyncStorage.removeItem('userToken');
-                
-                setTimeout(() => {
-                    router.replace("/(auth)/login");
-                }, 2000);
-            } else {
-                const data = await response.json();
-                setErrorMessage(data.message || "Erro ao alterar password");
-            }
+            await changePassword({ oldPassword, newPassword });
+            
+            setSuccessMessage("Password alterada com sucesso!");
+            setOldPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
+            setShowPasswordForm(false);
+            
+            // Redireciona para login após 2 segundos
+            setTimeout(() => {
+                router.replace("/(auth)/login");
+            }, 2000);
         } catch (error) {
-            setErrorMessage("Erro de conexão");
-            console.error(error);
+            const apiError = error as ApiError;
+            setErrorMessage(apiError.message);
         } finally {
             setUpdating(false);
         }
@@ -168,11 +120,7 @@ export default function ProfileScreen() {
 
     const handleLogout = async () => {
         try {
-            // Remove o token
-            await AsyncStorage.removeItem('userToken');
-            console.log('Token removido com sucesso');
-            
-            // Redireciona para o login
+            await logout();
             router.replace("/(auth)/login");
         } catch (error) {
             console.error('Erro ao fazer logout:', error);
@@ -180,14 +128,13 @@ export default function ProfileScreen() {
         }
     };
 
-    const getRoleName = (role: string) => {
-        const roles: Record<string, string> = {
-            ADMIN: "Administrador",
-            SALES: "Vendas",
-            WAREHOUSE: "Armazém",
-            CLIENT: "Cliente"
-        };
-        return roles[role] || role;
+    const resetPasswordForm = () => {
+        setShowPasswordForm(false);
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setErrorMessage("");
+        setSuccessMessage("");
     };
 
     if (loading) {
@@ -274,7 +221,7 @@ export default function ProfileScreen() {
                             <View className="flex-1">
                                 <Text className="text-xs text-gray-500">Membro desde</Text>
                                 <Text className="text-base text-gray-800 font-medium">
-                                    {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString('pt-PT') : "N/A"}
+                                    {profile.createdAt ? formatDate(profile.createdAt) : "N/A"}
                                 </Text>
                             </View>
                         </View>
@@ -316,15 +263,7 @@ export default function ProfileScreen() {
                                 <Text className="text-base font-semibold text-gray-800">
                                     Alterar Password
                                 </Text>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setShowPasswordForm(false);
-                                        setOldPassword("");
-                                        setNewPassword("");
-                                        setConfirmPassword("");
-                                        setErrorMessage("");
-                                    }}
-                                >
+                                <TouchableOpacity onPress={resetPasswordForm}>
                                     <Ionicons name="close" size={24} color="#6b7280" />
                                 </TouchableOpacity>
                             </View>

@@ -13,10 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Configuração da API
-const API_URL = 'http://localhost:3002';
+import { login, validateLoginFields, ApiError } from "../(services)/authService";
 
 export default function LoginScreen() {
     const [username, setUsername] = useState("");
@@ -31,57 +28,30 @@ export default function LoginScreen() {
         setErrorMessage("");
         setSuccessMessage("");
 
-        if (!username || !password) {
-            setErrorMessage("Por favor preencha todos os campos.");
+        // Validação dos campos
+        const validation = validateLoginFields(username, password);
+        if (!validation.valid) {
+            setErrorMessage(validation.message!);
             return;
         }
 
         setLoading(true);
 
         try {
-            const response = await fetch(`${API_URL}/auth/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    username,
-                    password,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                // Verificar se existe token na resposta
-                const token = data.token || data.accessToken || data.access_token;
-                
-                if (!token) {
-                    console.error('ERRO: Token não encontrado na resposta do backend!');
-                    console.log('Estrutura da resposta:', Object.keys(data));
-                    setErrorMessage("Erro: Token não recebido do servidor.");
-                    return;
-                }
-
-                // Guardar token no AsyncStorage
-                await AsyncStorage.setItem('userToken', token);
-                console.log('Token guardado com sucesso:', token.substring(0, 20) + '...');
-                
-                // Verificar se foi mesmo guardado
-                const savedToken = await AsyncStorage.getItem('userToken');
-                console.log('Token verificado:', savedToken ? 'Existe' : 'Não existe');
-                
-                setSuccessMessage(`Bem-vindo, ${data.user?.fullName || username}!`);
-                
-                setTimeout(() => {
-                    router.push("/home");
-                }, 1500);
-            } else {
-                setErrorMessage("Credenciais inválidas. Verifique os seus dados.");
-            }
+            // Chama o serviço de login
+            const response = await login({ username, password });
+            
+            // Mostra mensagem de sucesso
+            setSuccessMessage(`Bem-vindo, ${response.user?.fullName || username}!`);
+            
+            // Redireciona após 1.5 segundos
+            setTimeout(() => {
+                router.push("/home");
+            }, 1500);
         } catch (error) {
-            setErrorMessage("Erro de conexão. Verifique se o servidor está ativo.");
-            console.error('Erro no login:', error);
+            // Tratamento de erro
+            const apiError = error as ApiError;
+            setErrorMessage("Credenciais inválidas.");
         } finally {
             setLoading(false);
         }
