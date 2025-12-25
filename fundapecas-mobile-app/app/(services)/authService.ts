@@ -7,15 +7,16 @@ const API_URL = 'http://localhost:3002';
 // TIPOS E INTERFACES
 // ============================================
 
-export interface LoginRequest {
+export interface LoginCredentials {
     username: string;
     password: string;
 }
 
 export interface LoginResponse {
-    token: string;
-    user: {
-        id: string;
+    accessToken: string;
+    refreshToken: string;
+    user?: {
+        id: number;
         username: string;
         email: string;
         fullName: string;
@@ -29,81 +30,27 @@ export interface ApiError {
 }
 
 // ============================================
-// HELPERS PARA GESTÃO DE TOKEN
-// ============================================
-
-/**
- * Obtém o token guardado no AsyncStorage
- */
-export const getToken = async (): Promise<string | null> => {
-    try {
-        const token = await AsyncStorage.getItem('userToken');
-        console.log('Token obtido:', token ? 'Existe' : 'Não existe');
-        return token;
-    } catch (error) {
-        console.error('Erro ao obter token:', error);
-        return null;
-    }
-};
-
-/**
- * Guarda o token no AsyncStorage
- */
-export const saveToken = async (token: string): Promise<void> => {
-    try {
-        await AsyncStorage.setItem('userToken', token);
-        console.log('✅ Token guardado com sucesso');
-    } catch (error) {
-        console.error('❌ Erro ao guardar token:', error);
-        throw new Error('Não foi possível guardar o token');
-    }
-};
-
-/**
- * Remove o token do AsyncStorage
- */
-export const removeToken = async (): Promise<void> => {
-    try {
-        await AsyncStorage.removeItem('userToken');
-        console.log('✅ Token removido com sucesso');
-    } catch (error) {
-        console.error('❌ Erro ao remover token:', error);
-        throw new Error('Não foi possível remover o token');
-    }
-};
-
-// ============================================
 // VALIDAÇÕES
 // ============================================
 
-/**
- * Valida se os campos de login estão preenchidos
- */
 export const validateLoginFields = (
-    username: string, 
+    username: string,
     password: string
 ): { valid: boolean; message?: string } => {
     if (!username || !password) {
         return {
             valid: false,
-            message: 'Por favor preencha todos os campos.',
+            message: 'Preenche todos os campos.',
         };
     }
     
-    if (username.trim().length === 0) {
+    if (username.length < 3) {
         return {
             valid: false,
-            message: 'Username não pode estar vazio',
+            message: 'Username deve ter pelo menos 3 caracteres.',
         };
     }
-    
-    if (password.length === 0) {
-        return {
-            valid: false,
-            message: 'Password não pode estar vazia',
-        };
-    }
-    
+
     return { valid: true };
 };
 
@@ -112,15 +59,15 @@ export const validateLoginFields = (
 // ============================================
 
 /**
- * Faz login do utilizador
+ * Realiza o login do utilizador
  * @param credentials - Username e password
- * @returns LoginResponse com token e dados do utilizador
+ * @returns LoginResponse com tokens e dados do utilizador
  * @throws ApiError se houver erro no login
  */
-export const login = async (credentials: LoginRequest): Promise<LoginResponse> => {
+export const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
     try {
-        console.log('🔄 Tentando fazer login...');
-        
+        console.log('🔐 Tentando fazer login...');
+
         const response = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
             headers: {
@@ -129,103 +76,98 @@ export const login = async (credentials: LoginRequest): Promise<LoginResponse> =
             body: JSON.stringify(credentials),
         });
 
-        const data = await response.json();
-
+        // Tenta ler o corpo da resposta como texto primeiro
+        const responseText = await response.text();
+        
         if (!response.ok) {
-            console.error('❌ Erro no login:', data);
+            // Tenta fazer parse como JSON
+            let errorData;
+            try {
+                errorData = JSON.parse(responseText);
+            } catch {
+                // Se não for JSON, usa o texto direto
+                console.error('❌ Resposta não-JSON:', responseText);
+                
+                // Verifica se é rate limiting
+                if (responseText.toLowerCase().includes('too many')) {
+                    throw {
+                        message: 'Demasiadas tentativas. Aguarda alguns minutos.',
+                        statusCode: 429,
+                    } as ApiError;
+                }
+                
+                throw {
+                    message: responseText || 'Erro ao fazer login',
+                    statusCode: response.status,
+                } as ApiError;
+            }
+
+            // Se conseguiu fazer parse do JSON
             throw {
-                message: data.message || 'Credenciais inválidas',
+                message: errorData.message || 'Credenciais inválidas',
                 statusCode: response.status,
             } as ApiError;
         }
 
-        // Verificar se existe token na resposta
-        const token = data.token || data.accessToken || data.access_token;
+        // Parse do JSON de sucesso
+        const data = JSON.parse(responseText);
         
-        if (!token) {
-            console.error('❌ Token não encontrado na resposta:', data);
-            throw {
-                message: 'Token não recebido do servidor',
-                statusCode: 500,
-            } as ApiError;
+        // Guarda o token no AsyncStorage
+        if (data.accessToken) {
+            await AsyncStorage.setItem('userToken', data.accessToken);
+            console.log('✅ Token guardado com sucesso');
         }
 
-        // Guardar token no AsyncStorage
-        await saveToken(token);
-
-        console.log('✅ Login realizado com sucesso');
-        console.log('👤 Utilizador:', data.user?.username);
-
-        return {
-            token,
-            user: data.user,
-        };
+        console.log('✅ Login bem-sucedido');
+        return data;
     } catch (error) {
-        // Se já for um ApiError, re-throw
+        // Se já é um ApiError, re-throw
         if ((error as ApiError).message) {
             throw error;
         }
-        
-        // Caso contrário, é um erro de rede/conexão
+
+        // Erro de rede/conexão
         console.error('❌ Erro de conexão:', error);
         throw {
-            message: 'Erro de conexão. Verifique se o servidor está ativo.',
+            message: 'Erro de conexão. Verifica se o backend está ativo.',
             statusCode: 0,
         } as ApiError;
     }
 };
 
 /**
- * Faz logout do utilizador (remove token local)
+ * Faz logout do utilizador
  */
 export const logout = async (): Promise<void> => {
     try {
-        console.log('🔄 Fazendo logout...');
-        await removeToken();
-        console.log('✅ Logout realizado com sucesso');
+        await AsyncStorage.removeItem('userToken');
+        console.log('✅ Logout bem-sucedido');
     } catch (error) {
         console.error('❌ Erro ao fazer logout:', error);
-        throw error;
     }
 };
 
 /**
  * Verifica se o utilizador está autenticado
- * @returns true se existe token guardado
  */
 export const isAuthenticated = async (): Promise<boolean> => {
-    const token = await getToken();
-    return token !== null;
+    try {
+        const token = await AsyncStorage.getItem('userToken');
+        return !!token;
+    } catch (error) {
+        console.error('❌ Erro ao verificar autenticação:', error);
+        return false;
+    }
 };
 
 /**
- * Verifica se o token é válido fazendo uma chamada ao backend
- * @returns true se o token é válido
+ * Obtém o token guardado
  */
-export const validateToken = async (): Promise<boolean> => {
+export const getToken = async (): Promise<string | null> => {
     try {
-        const token = await getToken();
-        
-        if (!token) {
-            return false;
-        }
-
-        const response = await fetch(`${API_URL}/auth/me`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            },
-        });
-
-        if (response.status === 401) {
-            // Token inválido/expirado
-            await removeToken();
-            return false;
-        }
-
-        return response.ok;
+        return await AsyncStorage.getItem('userToken');
     } catch (error) {
-        console.error('Erro ao validar token:', error);
-        return false;
+        console.error('❌ Erro ao obter token:', error);
+        return null;
     }
 };
