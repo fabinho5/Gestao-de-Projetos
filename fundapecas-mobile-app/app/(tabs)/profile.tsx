@@ -2,11 +2,7 @@ import React, {Component} from 'react';
 import {Text, View} from 'react-native';
 
 const Profile = () => {
-        return (
-            <View>
-                <Text></Text>
-            </View>
-        )
+        return 
 }
 
-export default Profile;
+
