@@ -56,6 +56,40 @@ const PartDetails = () => {
         router.push(`/Parts/editPart?id=${id}`);
     };
 
+    const handleDelete = async () => {
+        // Mostrar confirmação antes de eliminar
+        Alert.alert(
+            'Confirmar Eliminação',
+            'Tem certeza que deseja eliminar esta peça? Esta ação não pode ser desfeita.',
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Eliminar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            // TODO: Chamar API para eliminar a peça
+                            // await deletePart(id as string);
+                            
+                            // TODO: Mostrar mensagem de sucesso
+                            // Alert.alert('Sucesso', 'Peça eliminada com sucesso');
+                            
+                            // TODO: Redirecionar para a lista de peças
+                            // router.replace('/parts');
+                        } catch (err) {
+                            // TODO: Tratar erro
+                            // const apiError = err as ApiError;
+                            // Alert.alert('Erro', apiError.message);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const handleLogoutPress = async () => {
         try {
             await AsyncStorage.removeItem('userToken');
@@ -109,6 +143,10 @@ const PartDetails = () => {
                     <TouchableOpacity onPress={handleEdit} style={styles.actionButtonPrimary}>
                         <Ionicons name="create-outline" size={20} color="#fff" />
                         <Text style={styles.actionButtonText}>Editar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleDelete} style={styles.actionButtonDelete}>
+                        <Ionicons name="trash-outline" size={20} color="#fff" />
+                        <Text style={styles.actionButtonText}>Eliminar</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -303,6 +341,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         backgroundColor: '#3b82f6',
+        borderRadius: 8,
+    },
+    actionButtonDelete: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#ef4444',
         borderRadius: 8,
     },
     actionButtonText: {
