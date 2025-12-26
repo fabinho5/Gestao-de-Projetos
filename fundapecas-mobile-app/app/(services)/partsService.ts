@@ -14,6 +14,9 @@ export interface Location {
     shelf: string;
     position: string;
     capacity: number;
+    _count: {
+        parts: number;
+    };
 }
 
 export interface PartImage {
@@ -24,12 +27,14 @@ export interface PartImage {
 
 export interface Specification {
     id: number;
+    name: string;
+}
+
+export interface PartSpecification {
+    id: number;
     specId: number;
     value: string;
-    spec: {
-        id: number;
-        name: string;
-    };
+    spec: Specification;
 }
 
 export interface SubReference {
@@ -38,6 +43,8 @@ export interface SubReference {
     partId: number;
 }
 
+export type PartCondition = 'NEW' | 'USED' | 'REFURBISHED';
+
 export interface Part {
     id: number;
     name: string;
@@ -45,7 +52,7 @@ export interface Part {
     refOEM?: string | null;
     description?: string | null;
     price: number;
-    condition: 'NEW' | 'USED' | 'REFURBISHED';
+    condition: PartCondition;
     categoryId: number;
     locationId: number;
     createdAt: string;
@@ -53,7 +60,7 @@ export interface Part {
     category: Category;
     location: Location;
     images: PartImage[];
-    specifications: Specification[];
+    specifications: PartSpecification[];
     subReferences?: SubReference[];
 }
 
@@ -63,6 +70,19 @@ export interface PaginatedParts {
     totalPages: number;
     totalItems: number;
     itemsPerPage: number;
+}
+
+export interface CreatePartData {
+    name: string;
+    refInternal: string;
+    refOEM?: string | null;
+    description?: string | null;
+    price: number;
+    condition: PartCondition;
+    categoryId: number;
+    locationId: number;
+    specifications?: { specId: number; value: string }[];
+    subReferences?: string[];
 }
 
 export interface ApiError {
@@ -76,6 +96,65 @@ const getToken = async (): Promise<string | null> => {
     } catch (error) {
         console.error('Erro ao obter token:', error);
         return null;
+    }
+};
+
+// ==================== PARTS ====================
+
+export const getPartById = async (id: string | number): Promise<Part> => {
+    try {
+        console.log(`📄 Carregando peça ID ${id}...`);
+
+        const token = await getToken();
+
+        if (!token) {
+            throw {
+                message: 'Token não encontrado. Faça login novamente.',
+                statusCode: 401,
+            } as ApiError;
+        }
+
+        const response = await fetch(`${API_URL}/parts/${id}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw {
+                    message: 'Peça não encontrada',
+                    statusCode: 404,
+                } as ApiError;
+            }
+
+            if (response.status === 401) {
+                throw {
+                    message: 'Sessão expirada. Faça login novamente.',
+                    statusCode: 401,
+                } as ApiError;
+            }
+
+            throw {
+                message: 'Erro ao carregar peça',
+                statusCode: response.status,
+            } as ApiError;
+        }
+
+        const data = await response.json();
+        console.log('✅ Peça carregada com sucesso');
+
+        return data;
+    } catch (error) {
+        if ((error as ApiError).message) {
+            throw error;
+        }
+
+        throw {
+            message: 'Erro de conexão. Verifique se o backend está rodando.',
+            statusCode: 0,
+        } as ApiError;
     }
 };
 
@@ -187,6 +266,244 @@ export const getPartByRef = async (ref: string): Promise<Part> => {
         } as ApiError;
     }
 };
+
+export const createPart = async (data: CreatePartData): Promise<Part> => {
+    try {
+        console.log('📝 Criando nova peça...');
+        
+        const token = await getToken();
+
+        if (!token) {
+            throw {
+                message: 'Token não encontrado. Faça login novamente.',
+                statusCode: 401,
+            } as ApiError;
+        }
+
+        const response = await fetch(`${API_URL}/parts`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                throw {
+                    message: 'Sessão expirada. Faça login novamente.',
+                    statusCode: 401,
+                } as ApiError;
+            }
+
+            if (response.status === 400) {
+                const errorData = await response.json();
+                throw {
+                    message: errorData.message || 'Dados inválidos',
+                    statusCode: 400,
+                } as ApiError;
+            }
+
+            if (response.status === 404) {
+                const errorData = await response.json();
+                throw {
+                    message: errorData.message || 'Categoria ou localização não encontrada',
+                    statusCode: 404,
+                } as ApiError;
+            }
+
+            if (response.status === 409) {
+                const errorData = await response.json();
+                throw {
+                    message: errorData.message || 'Localização sem capacidade disponível',
+                    statusCode: 409,
+                } as ApiError;
+            }
+            
+            throw {
+                message: 'Erro ao criar peça',
+                statusCode: response.status,
+            } as ApiError;
+        }
+
+        const part = await response.json();
+        console.log('✅ Peça criada com sucesso:', part.refInternal);
+        
+        return part;
+    } catch (error) {
+        if ((error as ApiError).message) {
+            throw error;
+        }
+        
+        console.error('❌ Erro de conexão:', error);
+        throw {
+            message: 'Erro de conexão. Verifique se o backend está rodando.',
+            statusCode: 0,
+        } as ApiError;
+    }
+};
+
+// ==================== CATEGORIES ====================
+
+export const getCategories = async (): Promise<Category[]> => {
+    try {
+        console.log('📂 Carregando categorias...');
+        
+        const token = await getToken();
+
+        if (!token) {
+            throw {
+                message: 'Token não encontrado. Faça login novamente.',
+                statusCode: 401,
+            } as ApiError;
+        }
+
+        const response = await fetch(`${API_URL}/categories`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                throw {
+                    message: 'Sessão expirada. Faça login novamente.',
+                    statusCode: 401,
+                } as ApiError;
+            }
+            
+            throw {
+                message: 'Erro ao carregar categorias',
+                statusCode: response.status,
+            } as ApiError;
+        }
+
+        const data = await response.json();
+        console.log('✅ Categorias carregadas:', data.length);
+        
+        return data;
+    } catch (error) {
+        if ((error as ApiError).message) {
+            throw error;
+        }
+        
+        console.error('❌ Erro de conexão:', error);
+        throw {
+            message: 'Erro de conexão',
+            statusCode: 0,
+        } as ApiError;
+    }
+};
+
+// ==================== LOCATIONS ====================
+
+export const getLocations = async (): Promise<Location[]> => {
+    try {
+        console.log('📍 Carregando localizações...');
+        
+        const token = await getToken();
+
+        if (!token) {
+            throw {
+                message: 'Token não encontrado. Faça login novamente.',
+                statusCode: 401,
+            } as ApiError;
+        }
+
+        const response = await fetch(`${API_URL}/locations`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                throw {
+                    message: 'Sessão expirada. Faça login novamente.',
+                    statusCode: 401,
+                } as ApiError;
+            }
+            
+            throw {
+                message: 'Erro ao carregar localizações',
+                statusCode: response.status,
+            } as ApiError;
+        }
+
+        const data = await response.json();
+        console.log('✅ Localizações carregadas:', data.length);
+        
+        return data;
+    } catch (error) {
+        if ((error as ApiError).message) {
+            throw error;
+        }
+        
+        console.error('❌ Erro de conexão:', error);
+        throw {
+            message: 'Erro de conexão',
+            statusCode: 0,
+        } as ApiError;
+    }
+};
+
+// ==================== SPECIFICATIONS ====================
+
+export const getSpecifications = async (): Promise<Specification[]> => {
+    try {
+        console.log('📋 Carregando especificações...');
+        
+        const token = await getToken();
+
+        if (!token) {
+            throw {
+                message: 'Token não encontrado. Faça login novamente.',
+                statusCode: 401,
+            } as ApiError;
+        }
+
+        const response = await fetch(`${API_URL}/specifications`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                throw {
+                    message: 'Sessão expirada. Faça login novamente.',
+                    statusCode: 401,
+                } as ApiError;
+            }
+            
+            throw {
+                message: 'Erro ao carregar especificações',
+                statusCode: response.status,
+            } as ApiError;
+        }
+
+        const data = await response.json();
+        console.log('✅ Especificações carregadas:', data.length);
+        
+        return data;
+    } catch (error) {
+        if ((error as ApiError).message) {
+            throw error;
+        }
+        
+        console.error('❌ Erro de conexão:', error);
+        throw {
+            message: 'Erro de conexão',
+            statusCode: 0,
+        } as ApiError;
+    }
+};
+
+// ==================== UTILITY FUNCTIONS ====================
 
 export const paginateParts = (
     parts: Part[],

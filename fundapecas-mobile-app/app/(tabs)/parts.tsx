@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,11 +8,12 @@ import {
     TouchableOpacity,
     RefreshControl,
     Alert,
-    FlatList,
+    Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../(shared)/Header';
 import SearchBar from '../(shared)/SearchBar';
@@ -25,6 +26,10 @@ import {
     PaginatedParts,
     ApiError,
 } from '../(services)/partsService';
+
+const PADDING = 5;
+const GAP = 16;
+const COLUMNS = 4;
 
 const Parts = () => {
     const router = useRouter();
@@ -41,10 +46,16 @@ const Parts = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Carregar peças ao montar o componente
-    useEffect(() => {
-        loadParts();
-    }, []);
+    // Calcular largura do card
+    const screenWidth = Dimensions.get('window').width;
+    const cardWidth = (screenWidth - (PADDING * 2) - (GAP * (COLUMNS - 1))) / (COLUMNS * 1.025);
+
+    // Carregar peças ao montar o componente e quando a tela receber foco
+    useFocusEffect(
+        useCallback(() => {
+            loadParts();
+        }, [])
+    );
 
     // Atualizar paginação quando a pesquisa ou página mudar
     useEffect(() => {
@@ -107,13 +118,23 @@ const Parts = () => {
         }
     };
 
-    const renderPartCard = ({ item: part }: { item: Part }) => (
+    const handlePartPress = (refInternal: string) => {
+        router.push(`/Parts/${refInternal}`);
+    };
+
+    // Navegar para criar nova peça
+    const handleCreatePart = () => {
+        router.push('/Parts/createPart');
+    };
+
+    // substituir renderPartCard existente por:
+    const renderPartCard = (part: Part, idx: number, isLastInRow: boolean) => (
         <TouchableOpacity
-            style={styles.card}
+            key={part.id}
+            style={[styles.card, { width: cardWidth, marginRight: isLastInRow ? 0 : GAP }]}
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Detalhes', `Peça: ${part.name}`)}
+            onPress={() => handlePartPress(part.refInternal)}
         >
-            {/* Imagem da peça */}
             <View style={styles.imageContainer}>
                 {part.images && part.images.length > 0 ? (
                     <Image
@@ -134,7 +155,6 @@ const Parts = () => {
                 </View>
             </View>
 
-            {/* Info da peça */}
             <View style={styles.cardBody}>
                 <Text style={styles.partName} numberOfLines={2}>{part.name}</Text>
                 
@@ -160,6 +180,29 @@ const Parts = () => {
             </View>
         </TouchableOpacity>
     );
+
+    // substituir renderPartsGrid existente por:
+    const renderPartsGrid = () => {
+        const parts = paginatedData.parts;
+        const rows = [];
+        
+        for (let i = 0; i < parts.length; i += COLUMNS) {
+            const rowParts = parts.slice(i, i + COLUMNS);
+            rows.push(
+                <View key={`row-${i}`} style={styles.row}>
+                    {rowParts.map((part, idx) => renderPartCard(part, idx, idx === rowParts.length - 1))}
+                    {rowParts.length < COLUMNS && Array.from({ length: COLUMNS - rowParts.length }).map((_, idxEmpty) => (
+                        <View
+                            key={`empty-${i}-${idxEmpty}`}
+                            style={[styles.emptyCard, { width: cardWidth, marginRight: (idxEmpty === COLUMNS - rowParts.length - 1) ? 0 : GAP }]}
+                        />
+                    ))}
+                </View>
+            );
+        }
+        
+        return <>{rows}</>;
+    };
 
     const renderPagination = () => {
         if (paginatedData.totalPages <= 1) return null;
@@ -255,6 +298,10 @@ const Parts = () => {
                 <Text style={styles.statsText}>
                     {paginatedData.totalItems} {paginatedData.totalItems === 1 ? 'peça encontrada' : 'peças encontradas'}
                 </Text>
+                <TouchableOpacity style={styles.createButton} onPress={handleCreatePart}>
+                    <Ionicons name="add-circle" size={20} color="#fff" />
+                    <Text style={styles.createButtonText}>Nova Peça</Text>
+                </TouchableOpacity>
                 {paginatedData.totalPages > 1 && (
                     <Text style={styles.statsText}>
                         Página {paginatedData.currentPage} de {paginatedData.totalPages}
@@ -264,7 +311,13 @@ const Parts = () => {
 
             <ScrollView
                 style={styles.content}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                    />
+                }
             >
                 {paginatedData.parts.length === 0 ? (
                     <View style={styles.emptyContainer}>
@@ -272,17 +325,16 @@ const Parts = () => {
                         <Text style={styles.emptyText}>
                             {searchQuery ? 'Nenhuma peça encontrada' : 'Nenhuma peça disponível'}
                         </Text>
+                        {!searchQuery && (
+                            <TouchableOpacity style={styles.emptyButton} onPress={handleCreatePart}>
+                                <Ionicons name="add-circle-outline" size={24} color="#3b82f6" />
+                                <Text style={styles.emptyButtonText}>Criar primeira peça</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 ) : (
                     <>
-                        <FlatList
-                            data={paginatedData.parts}
-                            renderItem={renderPartCard}
-                            keyExtractor={(item) => item.id.toString()}
-                            numColumns={4}
-                            columnWrapperStyle={styles.row}
-                            scrollEnabled={false}
-                        />
+                        {renderPartsGrid()}
                         {renderPagination()}
                     </>
                 )}
@@ -329,6 +381,7 @@ const styles = StyleSheet.create({
     statsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
         backgroundColor: '#fff',
@@ -339,24 +392,42 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#6b7280',
     },
+    createButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#3b82f6',
+        borderRadius: 8,
+    },
+    createButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
     content: {
         flex: 1,
-        padding: 16,
+        paddingHorizontal: 12,
+        paddingTop: 16,
     },
     row: {
-        justifyContent: 'space-between',
+        flexDirection: 'row',
         marginBottom: 16,
     },
     card: {
         backgroundColor: '#fff',
         borderRadius: 12,
         overflow: 'hidden',
-        width: '23.5%',
         elevation: 2,
         shadowColor: '#000',
         shadowOpacity: 0.1,
         shadowRadius: 4,
         shadowOffset: { width: 0, height: 2 },
+    },
+    emptyCard: {
+        backgroundColor: 'transparent',
+        borderRadius: 12,
     },
     imageContainer: {
         width: '100%',
@@ -441,6 +512,23 @@ const styles = StyleSheet.create({
         marginTop: 12,
         fontSize: 16,
         color: '#9ca3af',
+        marginBottom: 16,
+    },
+    emptyButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        backgroundColor: '#eff6ff',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#3b82f6',
+    },
+    emptyButtonText: {
+        color: '#3b82f6',
+        fontSize: 14,
+        fontWeight: '600',
     },
     pagination: {
         flexDirection: 'row',
