@@ -68,10 +68,15 @@ export class PartsController {
 
     static async createPart(req: Request, res: Response) {
         try {
+            const user = req.user;
+            if (!user) return res.status(401).json({ message: 'Not authenticated' });
+
             Logger.debug('Creating part with data:', req.body);
 
             const data = createPartSchema.parse(req.body);
-            const part = await PartsService.createPart(data);
+            const part = await PartsService.createPart(data, user.id);
+            
+            Logger.info(`User ${user.username} created part ${part.refInternal} (reqId=${req.headers['x-request-id'] || 'n/a'})`);
             res.status(201).json(part);
         } catch (error: any) {
             if (error instanceof z.ZodError) {

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { View, TextInput, Text, FlatList, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import Header from "../(shared)/Header";
 
 export default function HomeScreen() {
     const [query, setQuery] = useState("");
@@ -18,8 +20,26 @@ export default function HomeScreen() {
         p.name.toLowerCase().includes(query.toLowerCase())
     );
 
+    // 🔹 Handler para ver perfil
+    const handleProfilePress = () => {
+        console.log("Navegar para perfil");
+        router.push("/profile");
+    };
+
+    // 🔹 Handler para logout
+    const handleLogoutPress = () => {
+        console.log("🔴 Logout chamado - redirecionando...");
+        router.replace("/login");
+    };
+
     return (
         <SafeAreaView className="flex-1 bg-white">
+            {/* 🔹 Header */}
+            <Header 
+                onProfilePress={handleProfilePress}
+                onLogoutPress={handleLogoutPress}
+            />
+
             {/* 🔹 Barra de pesquisa */}
             <View className="flex-row items-center bg-gray-100 mx-4 mt-4 px-4 py-3 rounded-2xl shadow-sm">
                 <Ionicons name="search" size={22} color="#64748b" />

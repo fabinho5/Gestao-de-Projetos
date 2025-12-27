@@ -6,7 +6,7 @@ async function main() {
   console.log('🌱 A iniciar o seeding...');
 
   // 1. PASSWORD
-  const passwordHash = await bcrypt.hash('123456', 10);
+  const passwordHash = await bcrypt.hash('123456Tt', 10);
 
   // 2. ADMIN
   await prisma.user.upsert({
