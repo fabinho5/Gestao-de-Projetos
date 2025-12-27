@@ -75,4 +75,19 @@ export class PartsController {
             res.status(500).json({ message: 'Internal server error' });
         }
     } 
+
+    static async deletePart(req: Request, res: Response) {
+        try {
+            const { ref } = req.params;
+            await PartsService.deletePart(ref);
+            res.status(204).send();
+        } catch (error) {
+            if (error instanceof NotFoundError) {
+                return res.status(404).json({ message: error.message });
+            }
+
+            Logger.error('Error deleting part', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
 }

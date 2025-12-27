@@ -28,4 +28,11 @@ router.post(
   PartsController.createPart
 );
 
+router.delete(
+  '/:ref',
+  authenticate,
+  requireRole(UserRole.ADMIN),
+  PartsController.deletePart
+);
+
 export { router as partsRouter };

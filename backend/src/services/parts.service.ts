@@ -9,6 +9,7 @@ export class PartsService {
     
     static async getAllParts() {
         return prisma.part.findMany({
+            where: { deletedAt: null },
             include: { 
                 category: true,
                 location: true,
@@ -20,8 +21,8 @@ export class PartsService {
     }
 
     static async getPartById(ref: string) {
-        return prisma.part.findUnique({
-            where: { refInternal: ref },
+        return prisma.part.findFirst({
+            where: { refInternal: ref, deletedAt: null },
             include: { 
                 category: true, 
                 location: true,
@@ -46,19 +47,18 @@ export class PartsService {
     }) {
     
         // verificamos a capacidade
-        const location = await prisma.location.findUnique({
-            where: { id: data.locationId },
-            include: { 
-                _count: { select: { parts: true } }
-            }
-        });
+        const location = await prisma.location.findUnique({ where: { id: data.locationId } });
 
         if (!location) {
             throw new NotFoundError('Location not found');
         }
 
-        if (location._count.parts >= location.capacity) {
-            throw new ConflictError(`Location ${location.fullCode} is full (${location._count.parts}/${location.capacity})`);
+        const activePartsAtLocation = await prisma.part.count({
+            where: { locationId: data.locationId, deletedAt: null }
+        });
+
+        if (activePartsAtLocation >= location.capacity) {
+            throw new ConflictError(`Location ${location.fullCode} is full (${activePartsAtLocation}/${location.capacity})`);
         }
 
         
@@ -105,5 +105,18 @@ export class PartsService {
             }
             throw error;
         }
+    }
+
+    static async deletePart(ref: string) {
+        const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
+
+        if (!part) {
+            throw new NotFoundError('Part not found');
+        }
+
+        await prisma.part.update({
+            where: { id: part.id },
+            data: { deletedAt: new Date(), isVisible: false }
+        });
     }
 }
