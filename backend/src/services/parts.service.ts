@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { PartCondition } from '@prisma/client';
+import { PartCondition, Prisma } from '@prisma/client';
 import { stockMovementService } from './stockMovement.service.js';
 
 export class NotFoundError extends Error {}
@@ -189,7 +189,7 @@ export class PartsService {
         
         // se cheganmos aqui, é porque está tudo ok
         try {
-            return await prisma.part.create({
+            const newpart = await prisma.part.create({
                 data: {
                     name: data.name,
                     refInternal: data.refInternal,
@@ -217,6 +217,10 @@ export class PartsService {
                     images: true
                 }
             });
+
+            await stockMovementService.recordEntry(newpart.id, createdByUserId, data.locationId);
+            return newpart;
+            
         } catch (error: any) {
             if (error instanceof Prisma.PrismaClientKnownRequestError) {
                 if (error.code === 'P2002') {
