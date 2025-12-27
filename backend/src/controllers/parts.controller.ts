@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { PartCondition } from '@prisma/client';
-import { PartsService, NotFoundError, ConflictError } from '../services/parts.service.js';
+import { PartsService, NotFoundError, ConflictError, BadRequestError } from '../services/parts.service.js';
 import { Logger } from '../utils/logger.js';
 
 const createPartSchema = z.object({
@@ -19,6 +19,15 @@ const createPartSchema = z.object({
     subReferences: z.array(z.string().min(1)).optional(),
 });
 
+const visibilitySchema = z.object({
+    isVisible: z.boolean(),
+});
+
+const updatePartSchema = createPartSchema.partial().refine(
+    (val) => Object.keys(val).length > 0,
+    { message: 'At least one field must be provided to update' }
+);
+
 export class PartsController {
     
     static async getAllParts(req: Request, res: Response) {
@@ -27,6 +36,16 @@ export class PartsController {
             res.status(200).json(parts);
         } catch (error) {
             Logger.error('Error fetching all parts', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    static async getCategories(req: Request, res: Response) {
+        try {
+            const categories = await PartsService.getCategories();
+            res.status(200).json(categories);
+        } catch (error) {
+            Logger.error('Error fetching categories', error);
             res.status(500).json({ message: 'Internal server error' });
         }
     }
@@ -72,8 +91,77 @@ export class PartsController {
                 return res.status(409).json({ message: error.message });
             }
 
+            if (error instanceof BadRequestError) {
+                return res.status(400).json({ message: error.message });
+            }
+
             Logger.error('Error creating part', error);
             res.status(500).json({ message: 'Internal server error' });
         }
     } 
+
+    static async updatePart(req: Request, res: Response) {
+        try {
+            const { ref } = req.params;
+            const data = updatePartSchema.parse(req.body);
+
+            const part = await PartsService.updatePart(ref, data);
+            res.status(200).json(part);
+        } catch (error: any) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).json({ message: 'Validation failed', errors: error.errors });
+            }
+
+            if (error instanceof NotFoundError) {
+                return res.status(404).json({ message: error.message });
+            }
+
+            if (error instanceof ConflictError) {
+                return res.status(409).json({ message: error.message });
+            }
+
+            if (error instanceof BadRequestError) {
+                return res.status(400).json({ message: error.message });
+            }
+
+            Logger.error('Error updating part', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    static async deletePart(req: Request, res: Response) {
+        try {
+            const { ref } = req.params;
+            await PartsService.deletePart(ref);
+            res.status(204).send();
+        } catch (error) {
+            if (error instanceof NotFoundError) {
+                return res.status(404).json({ message: error.message });
+            }
+
+            Logger.error('Error deleting part', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    static async setVisibility(req: Request, res: Response) {
+        try {
+            const { ref } = req.params;
+            const { isVisible } = visibilitySchema.parse(req.body);
+
+            const part = await PartsService.setVisibility(ref, isVisible);
+            res.status(200).json(part);
+        } catch (error: any) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).json({ message: 'Validation failed', errors: error.errors });
+            }
+
+            if (error instanceof NotFoundError) {
+                return res.status(404).json({ message: error.message });
+            }
+
+            Logger.error('Error updating part visibility', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
 }

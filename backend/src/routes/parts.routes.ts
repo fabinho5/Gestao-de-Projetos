@@ -21,6 +21,39 @@ router.get(
   PartsController.getPartById
 );
 
-router.post("/", authenticate, PartsController.createPart);
+router.get(
+  '/categories/list',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.getCategories
+);
+
+router.post(
+  "/",
+  authenticate,
+  requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
+  PartsController.createPart
+);
+
+router.patch(
+  '/:ref',
+  authenticate,
+  requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
+  PartsController.updatePart
+);
+
+router.delete(
+  '/:ref',
+  authenticate,
+  requireRole(UserRole.ADMIN),
+  PartsController.deletePart
+);
+
+router.patch(
+  '/:ref/visibility',
+  authenticate,
+  requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
+  PartsController.setVisibility
+);
 
 export { router as partsRouter };

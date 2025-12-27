@@ -116,8 +116,8 @@ model Part {
   supplierId  Int?      @map("supplier_id")
   supplier    Supplier? @relation(fields: [supplierId], references: [id])
 
-  locationId  Int?      @map("location_id")
-  location    Location? @relation(fields: [locationId], references: [id])
+  locationId  Int       @map("location_id")
+  location    Location  @relation(fields: [locationId], references: [id])
   
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
