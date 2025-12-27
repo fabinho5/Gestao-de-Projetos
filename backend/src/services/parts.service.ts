@@ -84,7 +84,6 @@ export class PartsService {
             throw new NotFoundError('Part not found');
         }
 
-        let locationCheckPassed = true;
         if (data.locationId && data.locationId !== part.locationId) {
             const location = await prisma.location.findUnique({ where: { id: data.locationId } });
             if (!location) {
@@ -98,7 +97,6 @@ export class PartsService {
             if (activePartsAtLocation >= location.capacity) {
                 throw new ConflictError(`Location ${location.fullCode} is full (${activePartsAtLocation}/${location.capacity})`);
             }
-            locationCheckPassed = true;
         }
 
         try {
