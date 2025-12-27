@@ -77,15 +77,13 @@ export class PartsService {
                     categoryId: data.categoryId,
                     locationId: data.locationId,
                     
-                    specifications: {
-                        create: data.specifications
-                    },
+                    ...(data.specifications?.length
+                        ? { specifications: { create: data.specifications } }
+                        : {}),
 
-                    // <--- NOVO: Gravar Sub-Referências
-                    // Transforma ["REF1", "REF2"] em [{ value: "REF1" }, { value: "REF2" }]
-                    subReferences: {
-                        create: data.subReferences?.map(ref => ({ value: ref }))
-                    }
+                    ...(data.subReferences?.length
+                        ? { subReferences: { create: data.subReferences.map(ref => ({ value: ref })) } }
+                        : {})
                 },
                 include: { 
                     category: true, 
