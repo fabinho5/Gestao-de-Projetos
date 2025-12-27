@@ -42,4 +42,11 @@ router.delete(
   PartsController.deletePart
 );
 
+router.patch(
+  '/:ref/visibility',
+  authenticate,
+  requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
+  PartsController.setVisibility
+);
+
 export { router as partsRouter };

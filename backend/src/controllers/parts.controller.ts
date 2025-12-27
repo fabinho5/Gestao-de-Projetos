@@ -19,6 +19,10 @@ const createPartSchema = z.object({
     subReferences: z.array(z.string().min(1)).optional(),
 });
 
+const visibilitySchema = z.object({
+    isVisible: z.boolean(),
+});
+
 export class PartsController {
     
     static async getAllParts(req: Request, res: Response) {
@@ -97,6 +101,27 @@ export class PartsController {
             }
 
             Logger.error('Error deleting part', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    static async setVisibility(req: Request, res: Response) {
+        try {
+            const { ref } = req.params;
+            const { isVisible } = visibilitySchema.parse(req.body);
+
+            const part = await PartsService.setVisibility(ref, isVisible);
+            res.status(200).json(part);
+        } catch (error: any) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).json({ message: 'Validation failed', errors: error.errors });
+            }
+
+            if (error instanceof NotFoundError) {
+                return res.status(404).json({ message: error.message });
+            }
+
+            Logger.error('Error updating part visibility', error);
             res.status(500).json({ message: 'Internal server error' });
         }
     }

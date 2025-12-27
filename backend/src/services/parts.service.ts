@@ -45,6 +45,26 @@ export class PartsService {
         });
     }
 
+    static async setVisibility(ref: string, isVisible: boolean) {
+        const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
+
+        if (!part) {
+            throw new NotFoundError('Part not found');
+        }
+
+        return prisma.part.update({
+            where: { id: part.id },
+            data: { isVisible },
+            include: {
+                category: true,
+                location: true,
+                images: true,
+                specifications: { include: { spec: true } },
+                subReferences: true
+            }
+        });
+    }
+
     static async createPart(data: { 
         name: string; 
         refInternal: string;
