@@ -21,6 +21,13 @@ router.get(
   PartsController.getPartById
 );
 
+router.get(
+  '/categories/list',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.getCategories
+);
+
 router.post(
   "/",
   authenticate,

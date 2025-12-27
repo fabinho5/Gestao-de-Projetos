@@ -33,6 +33,18 @@ export class PartsService {
         });
     }
 
+    static async getCategories() {
+        return prisma.category.findMany({
+            where: { deletedAt: null },
+            select: {
+                id: true,
+                name: true,
+                parentId: true,
+            },
+            orderBy: { name: 'asc' }
+        });
+    }
+
     static async createPart(data: { 
         name: string; 
         refInternal: string;
