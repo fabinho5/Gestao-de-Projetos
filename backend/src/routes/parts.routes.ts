@@ -35,6 +35,13 @@ router.post(
   PartsController.createPart
 );
 
+router.patch(
+  '/:ref',
+  authenticate,
+  requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
+  PartsController.updatePart
+);
+
 router.delete(
   '/:ref',
   authenticate,

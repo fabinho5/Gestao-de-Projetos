@@ -65,6 +65,98 @@ export class PartsService {
         });
     }
 
+    static async updatePart(ref: string, data: Partial<{ 
+        name: string; 
+        refInternal: string;
+        refOEM?: string | null;
+        description?: string | null; 
+        price: number; 
+        condition: PartCondition; 
+        categoryId: number;
+        locationId: number;
+        specifications?: { specId: number; value: string }[];
+        subReferences?: string[];
+    }>) {
+        const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
+
+        if (!part) {
+            throw new NotFoundError('Part not found');
+        }
+
+        let locationCheckPassed = true;
+        if (data.locationId && data.locationId !== part.locationId) {
+            const location = await prisma.location.findUnique({ where: { id: data.locationId } });
+            if (!location) {
+                throw new NotFoundError('Location not found');
+            }
+
+            const activePartsAtLocation = await prisma.part.count({
+                where: { locationId: data.locationId, deletedAt: null }
+            });
+
+            if (activePartsAtLocation >= location.capacity) {
+                throw new ConflictError(`Location ${location.fullCode} is full (${activePartsAtLocation}/${location.capacity})`);
+            }
+            locationCheckPassed = true;
+        }
+
+        try {
+            const updated = await prisma.$transaction(async (tx) => {
+                // Replace specifications if provided
+                if (data.specifications) {
+                    await tx.partSpecification.deleteMany({ where: { partId: part.id } });
+                    if (data.specifications.length) {
+                        await tx.partSpecification.createMany({
+                            data: data.specifications.map((s) => ({
+                                partId: part.id,
+                                specId: s.specId,
+                                value: s.value,
+                            })),
+                        });
+                    }
+                }
+
+                // Replace subReferences if provided
+                if (data.subReferences) {
+                    await tx.partReference.deleteMany({ where: { partId: part.id } });
+                    if (data.subReferences.length) {
+                        await tx.partReference.createMany({
+                            data: data.subReferences.map((value) => ({ partId: part.id, value })),
+                        });
+                    }
+                }
+
+                const { specifications, subReferences, ...rest } = data;
+
+                return tx.part.update({
+                    where: { id: part.id },
+                    data: rest,
+                    include: {
+                        category: true,
+                        location: true,
+                        images: true,
+                        specifications: { include: { spec: true } },
+                        subReferences: true,
+                    },
+                });
+            });
+
+            return updated;
+        } catch (error: any) {
+            if (error instanceof Prisma.PrismaClientKnownRequestError) {
+                if (error.code === 'P2002') {
+                    throw new ConflictError('Part refInternal already exists');
+                }
+
+                if (error.code === 'P2003') {
+                    const field = (error.meta?.field_name as string | undefined) || 'related id';
+                    throw new BadRequestError(`Invalid or missing ${field}`);
+                }
+            }
+            throw error;
+        }
+    }
+
     static async createPart(data: { 
         name: string; 
         refInternal: string;
