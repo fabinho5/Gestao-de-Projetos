@@ -13,7 +13,8 @@ export class PartsService {
                 location: true,
                 images: true,
                 // NOVO: Queremos ver as especificações quando listamos
-                specifications: { include: { spec: true } } 
+                specifications: { include: { spec: true } },
+                subReferences: true
             }
         });
     }
@@ -26,7 +27,8 @@ export class PartsService {
                 location: true,
                 images: true,
                 // NOVO: Traz os valores e o nome da spec (ex: "Voltagem: 12V")
-                specifications: { include: { spec: true } }
+                specifications: { include: { spec: true } },
+                subReferences: true
             }
         });
     }
