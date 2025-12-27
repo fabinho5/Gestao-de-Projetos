@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { PartCondition } from '@prisma/client';
-import { PartsService, NotFoundError, ConflictError } from '../services/parts.service.js';
+import { PartsService, NotFoundError, ConflictError, BadRequestError } from '../services/parts.service.js';
 import { Logger } from '../utils/logger.js';
 
 const createPartSchema = z.object({
@@ -65,6 +65,10 @@ export class PartsController {
 
             if (error instanceof ConflictError) {
                 return res.status(409).json({ message: error.message });
+            }
+
+            if (error instanceof BadRequestError) {
+                return res.status(400).json({ message: error.message });
             }
 
             Logger.error('Error creating part', error);

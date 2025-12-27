@@ -3,6 +3,7 @@ import { PartCondition, Prisma } from '@prisma/client';
 
 export class NotFoundError extends Error {}
 export class ConflictError extends Error {}
+export class BadRequestError extends Error {}
 
 export class PartsService {
     
@@ -12,7 +13,6 @@ export class PartsService {
                 category: true,
                 location: true,
                 images: true,
-                // NOVO: Queremos ver as especificações quando listamos
                 specifications: { include: { spec: true } },
                 subReferences: true
             }
@@ -26,7 +26,6 @@ export class PartsService {
                 category: true, 
                 location: true,
                 images: true,
-                // NOVO: Traz os valores e o nome da spec (ex: "Voltagem: 12V")
                 specifications: { include: { spec: true } },
                 subReferences: true
             }
@@ -94,8 +93,15 @@ export class PartsService {
                 }
             });
         } catch (error: any) {
-            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                throw new ConflictError('Part refInternal already exists');
+            if (error instanceof Prisma.PrismaClientKnownRequestError) {
+                if (error.code === 'P2002') {
+                    throw new ConflictError('Part refInternal already exists');
+                }
+
+                if (error.code === 'P2003') {
+                    const field = (error.meta?.field_name as string | undefined) || 'related id';
+                    throw new BadRequestError(`Invalid or missing ${field}`);
+                }
             }
             throw error;
         }
