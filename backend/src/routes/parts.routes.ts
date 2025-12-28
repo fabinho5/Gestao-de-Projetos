@@ -15,6 +15,13 @@ router.get(
 );
 
 router.get(
+  '/search',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.searchParts
+);
+
+router.get(
   '/:ref',
   authenticate,
   requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),

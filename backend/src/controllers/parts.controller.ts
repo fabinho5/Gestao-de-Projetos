@@ -28,6 +28,37 @@ const updatePartSchema = createPartSchema.partial().refine(
     { message: 'At least one field must be provided to update' }
 );
 
+const sortByEnum = z.enum(['name', 'price', 'createdAt', 'updatedAt', 'refInternal']);
+const sortOrderEnum = z.enum(['asc', 'desc']);
+
+const booleanLike = z.preprocess((val) => {
+    if (val === 'true' || val === '1' || val === true) return true;
+    if (val === 'false' || val === '0' || val === false) return false;
+    return val;
+}, z.boolean());
+
+const searchPartsSchema = z
+    .object({
+        text: z.string().trim().min(1).optional(),
+        categoryId: z.coerce.number().int().positive().optional(),
+        condition: z.nativeEnum(PartCondition).optional(),
+        priceMin: z.coerce.number().nonnegative().optional(),
+        priceMax: z.coerce.number().nonnegative().optional(),
+        locationId: z.coerce.number().int().positive().optional(),
+        isVisible: booleanLike.optional(),
+        page: z.coerce.number().int().positive().default(1),
+        pageSize: z.coerce.number().int().positive().max(100).default(20),
+        sortBy: sortByEnum.default('createdAt'),
+        sortOrder: sortOrderEnum.default('desc'),
+    })
+    .refine(
+        (data) =>
+            data.priceMin === undefined ||
+            data.priceMax === undefined ||
+            data.priceMin <= data.priceMax,
+        { message: 'priceMin cannot be greater than priceMax', path: ['priceMin'] }
+    );
+
 export class PartsController {
     
     static async getAllParts(req: Request, res: Response) {
@@ -36,6 +67,21 @@ export class PartsController {
             res.status(200).json(parts);
         } catch (error) {
             Logger.error('Error fetching all parts', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    static async searchParts(req: Request, res: Response) {
+        try {
+            const filters = searchPartsSchema.parse(req.query);
+            const result = await PartsService.searchParts(filters);
+            res.status(200).json(result);
+        } catch (error: any) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).json({ message: 'Validation failed', errors: error.errors });
+            }
+
+            Logger.error('Error searching parts', error);
             res.status(500).json({ message: 'Internal server error' });
         }
     }

@@ -6,6 +6,22 @@ export class NotFoundError extends Error {}
 export class ConflictError extends Error {}
 export class BadRequestError extends Error {}
 
+type SortField = 'name' | 'price' | 'createdAt' | 'updatedAt' | 'refInternal';
+
+export type SearchPartsParams = {
+    text?: string;
+    categoryId?: number;
+    condition?: PartCondition;
+    priceMin?: number;
+    priceMax?: number;
+    locationId?: number;
+    isVisible?: boolean;
+    sortBy: SortField;
+    sortOrder: 'asc' | 'desc';
+    page: number;
+    pageSize: number;
+};
+
 export class PartsService {
     
     static async getAllParts() {
@@ -44,6 +60,72 @@ export class PartsService {
             },
             orderBy: { name: 'asc' }
         });
+    }
+
+    static async searchParts(params: SearchPartsParams) {
+        const {
+            text,
+            categoryId,
+            condition,
+            priceMin,
+            priceMax,
+            locationId,
+            isVisible,
+            sortBy,
+            sortOrder,
+            page,
+            pageSize,
+        } = params;
+
+        const where: Prisma.PartWhereInput = { deletedAt: null };
+
+        if (categoryId !== undefined) where.categoryId = categoryId;
+        if (condition) where.condition = condition;
+        if (locationId !== undefined) where.locationId = locationId;
+        if (isVisible !== undefined) where.isVisible = isVisible;
+
+        if (priceMin !== undefined || priceMax !== undefined) {
+            where.price = {
+                ...(priceMin !== undefined ? { gte: priceMin } : {}),
+                ...(priceMax !== undefined ? { lte: priceMax } : {}),
+            };
+        }
+
+        if (text) {
+            where.OR = [
+                { name: { contains: text } },
+                { refInternal: { contains: text } },
+                { refOEM: { contains: text } },
+                { subReferences: { some: { value: { contains: text } } } },
+            ];
+        }
+
+        const orderBy: Prisma.PartOrderByWithRelationInput = { [sortBy]: sortOrder };
+
+        const [total, items] = await prisma.$transaction([
+            prisma.part.count({ where }),
+            prisma.part.findMany({
+                where,
+                orderBy,
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+                include: {
+                    category: true,
+                    location: true,
+                    images: true,
+                    specifications: { include: { spec: true } },
+                    subReferences: true,
+                },
+            }),
+        ]);
+
+        return {
+            items,
+            total,
+            page,
+            pageSize,
+            totalPages: Math.ceil(total / pageSize),
+        };
     }
 
     static async setVisibility(ref: string, isVisible: boolean) {
