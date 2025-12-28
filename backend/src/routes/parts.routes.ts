@@ -15,6 +15,20 @@ router.get(
 );
 
 router.get(
+  '/search',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.searchParts
+);
+
+router.get(
+  '/:ref/history',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.getPartHistory
+);
+
+router.get(
   '/:ref',
   authenticate,
   requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
@@ -26,6 +40,13 @@ router.get(
   authenticate,
   requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
   PartsController.getCategories
+);
+
+router.get(
+  '/specifications/list',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.getSpecifications
 );
 
 router.post(
