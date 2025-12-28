@@ -111,6 +111,21 @@ export class PartsController {
         }
     }
 
+    static async getPartHistory(req: Request, res: Response) {
+        try {
+            const { ref } = req.params;
+            const data = await PartsService.getPartHistory(ref);
+            res.status(200).json(data);
+        } catch (error: any) {
+            if (error instanceof NotFoundError) {
+                return res.status(404).json({ message: error.message });
+            }
+
+            Logger.error('Error fetching part history', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
 
     static async createPart(req: Request, res: Response) {
         try {

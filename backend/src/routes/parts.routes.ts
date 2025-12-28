@@ -22,6 +22,13 @@ router.get(
 );
 
 router.get(
+  '/:ref/history',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.getPartHistory
+);
+
+router.get(
   '/:ref',
   authenticate,
   requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),

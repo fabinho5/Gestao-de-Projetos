@@ -128,6 +128,46 @@ export class PartsService {
         };
     }
 
+    static async getPartHistory(ref: string) {
+        const part = await prisma.part.findFirst({
+            where: { refInternal: ref, deletedAt: null },
+            include: {
+                category: true,
+                location: true,
+                images: true,
+                specifications: { include: { spec: true } },
+                subReferences: true,
+            },
+        });
+
+        if (!part) {
+            throw new NotFoundError('Part not found');
+        }
+
+        const [movements, reservations] = await prisma.$transaction([
+            prisma.stockMovement.findMany({
+                where: { partId: part.id },
+                orderBy: { timestamp: 'desc' },
+                include: {
+                    user: { select: { id: true, username: true, fullName: true, role: true } },
+                    sourceLoc: true,
+                    destLoc: true,
+                },
+            }),
+            prisma.reservation.findMany({
+                where: { partId: part.id },
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    user: { select: { id: true, username: true, fullName: true, role: true } },
+                    assignedTo: { select: { id: true, username: true, fullName: true, role: true } },
+                    returnLocation: true,
+                },
+            }),
+        ]);
+
+        return { part, movements, reservations };
+    }
+
     static async setVisibility(ref: string, isVisible: boolean) {
         const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
 
