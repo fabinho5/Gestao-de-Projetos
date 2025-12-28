@@ -62,6 +62,13 @@ export class PartsService {
         });
     }
 
+    static async getSpecifications() {
+        return prisma.specification.findMany({
+            select: { id: true, name: true, unit: true },
+            orderBy: { name: 'asc' },
+        });
+    }
+
     static async searchParts(params: SearchPartsParams) {
         const {
             text,

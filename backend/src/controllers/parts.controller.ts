@@ -96,6 +96,16 @@ export class PartsController {
         }
     }
 
+    static async getSpecifications(req: Request, res: Response) {
+        try {
+            const specs = await PartsService.getSpecifications();
+            res.status(200).json(specs);
+        } catch (error) {
+            Logger.error('Error fetching specifications', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
     static async getPartById(req: Request, res: Response) {
         try {
             const { ref } = req.params; // podiamos ter feito apenas const ref  = req.params.ref; {} faz destructuring

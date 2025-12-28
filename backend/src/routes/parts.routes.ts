@@ -42,6 +42,13 @@ router.get(
   PartsController.getCategories
 );
 
+router.get(
+  '/specifications/list',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.getSpecifications
+);
+
 router.post(
   "/",
   authenticate,
