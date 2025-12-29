@@ -7,7 +7,6 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     RefreshControl,
-    Alert,
     Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -26,6 +25,7 @@ import {
     PaginatedParts,
     ApiError,
 } from '../(services)/partsService';
+import { getUserFavorites } from '../(services)/favoritesService';
 
 const PADDING = 5;
 const GAP = 16;
@@ -45,6 +45,7 @@ const Parts = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
 
     // Calcular largura do card
     const screenWidth = Dimensions.get('window').width;
@@ -54,6 +55,7 @@ const Parts = () => {
     useFocusEffect(
         useCallback(() => {
             loadParts();
+            loadFavorites();
         }, [])
     );
 
@@ -74,15 +76,25 @@ const Parts = () => {
         } catch (err) {
             const apiError = err as ApiError;
             setError(apiError.message);
-            Alert.alert('Erro', apiError.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadFavorites = async () => {
+        try {
+            const favorites = await getUserFavorites();
+            const ids = new Set(favorites.map((fav: any) => fav.id));
+            setFavoriteIds(ids);
+        } catch (err) {
+            console.error('Erro ao carregar favoritos:', err);
         }
     };
 
     const onRefresh = async () => {
         setRefreshing(true);
         await loadParts();
+        await loadFavorites();
         setRefreshing(false);
     };
 
@@ -114,7 +126,6 @@ const Parts = () => {
             router.replace('/login');
         } catch (error) {
             console.error('Erro ao fazer logout:', error);
-            Alert.alert('Erro', 'Não foi possível fazer logout');
         }
     };
 
@@ -122,66 +133,74 @@ const Parts = () => {
         router.push(`/Parts/${refInternal}`);
     };
 
-    // Navegar para criar nova peça
     const handleCreatePart = () => {
         router.push('/Parts/createPart');
     };
 
-    // substituir renderPartCard existente por:
-    const renderPartCard = (part: Part, idx: number, isLastInRow: boolean) => (
-        <TouchableOpacity
-            key={part.id}
-            style={[styles.card, { width: cardWidth, marginRight: isLastInRow ? 0 : GAP }]}
-            activeOpacity={0.7}
-            onPress={() => handlePartPress(part.refInternal)}
-        >
-            <View style={styles.imageContainer}>
-                {part.images && part.images.length > 0 ? (
-                    <Image
-                        source={{ uri: part.images[0].url }}
-                        style={styles.partImage}
-                        contentFit="cover"
-                    />
-                ) : (
-                    <View style={styles.placeholderImage}>
-                        <Ionicons name="image-outline" size={40} color="#9ca3af" />
+    const renderPartCard = (part: Part, idx: number, isLastInRow: boolean) => {
+        const isFav = favoriteIds.has(part.id);
+        
+        return (
+            <TouchableOpacity
+                key={part.id}
+                style={[styles.card, { width: cardWidth, marginRight: isLastInRow ? 0 : GAP }]}
+                activeOpacity={0.7}
+                onPress={() => handlePartPress(part.refInternal)}
+            >
+                <View style={styles.imageContainer}>
+                    {part.images && part.images.length > 0 ? (
+                        <Image
+                            source={{ uri: part.images[0].url }}
+                            style={styles.partImage}
+                            contentFit="cover"
+                        />
+                    ) : (
+                        <View style={styles.placeholderImage}>
+                            <Ionicons name="image-outline" size={40} color="#9ca3af" />
+                        </View>
+                    )}
+                    
+                    <View style={styles.conditionBadge}>
+                        <Text style={styles.conditionText}>
+                            {getConditionName(part.condition)}
+                        </Text>
                     </View>
-                )}
-                
-                <View style={styles.conditionBadge}>
-                    <Text style={styles.conditionText}>
-                        {getConditionName(part.condition)}
-                    </Text>
-                </View>
-            </View>
 
-            <View style={styles.cardBody}>
-                <Text style={styles.partName} numberOfLines={2}>{part.name}</Text>
-                
-                <Text style={styles.partRef} numberOfLines={1}>
-                    Ref: {part.refInternal}
-                </Text>
-
-                <View style={styles.categoryRow}>
-                    <Ionicons name="pricetag-outline" size={12} color="#9ca3af" />
-                    <Text style={styles.categoryText} numberOfLines={1}>
-                        {part.category.name}
-                    </Text>
+                    {/* Indicador de Favorito */}
+                    {isFav && (
+                        <View style={styles.favoriteIndicator}>
+                            <Ionicons name="heart" size={14} color="#fff" />
+                        </View>
+                    )}
                 </View>
 
-                <View style={styles.locationRow}>
-                    <Ionicons name="location-outline" size={12} color="#9ca3af" />
-                    <Text style={styles.locationText} numberOfLines={1}>
-                        {part.location.fullCode}
+                <View style={styles.cardBody}>
+                    <Text style={styles.partName} numberOfLines={2}>{part.name}</Text>
+                    
+                    <Text style={styles.partRef} numberOfLines={1}>
+                        Ref: {part.refInternal}
                     </Text>
+
+                    <View style={styles.categoryRow}>
+                        <Ionicons name="pricetag-outline" size={12} color="#9ca3af" />
+                        <Text style={styles.categoryText} numberOfLines={1}>
+                            {part.category.name}
+                        </Text>
+                    </View>
+
+                    <View style={styles.locationRow}>
+                        <Ionicons name="location-outline" size={12} color="#9ca3af" />
+                        <Text style={styles.locationText} numberOfLines={1}>
+                            {part.location.fullCode}
+                        </Text>
+                    </View>
+
+                    <Text style={styles.partPrice}>{formatPrice(part.price)}</Text>
                 </View>
+            </TouchableOpacity>
+        );
+    };
 
-                <Text style={styles.partPrice}>{formatPrice(part.price)}</Text>
-            </View>
-        </TouchableOpacity>
-    );
-
-    // substituir renderPartsGrid existente por:
     const renderPartsGrid = () => {
         const parts = paginatedData.parts;
         const rows = [];
@@ -210,18 +229,17 @@ const Parts = () => {
         const { currentPage, totalPages } = paginatedData;
         const pages: number[] = [];
 
-        // Lógica para mostrar páginas: primeira, atual-1, atual, atual+1, última
         if (totalPages <= 5) {
             for (let i = 1; i <= totalPages; i++) {
                 pages.push(i);
             }
         } else {
             pages.push(1);
-            if (currentPage > 3) pages.push(-1); // -1 representa "..."
+            if (currentPage > 3) pages.push(-1);
             for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
                 pages.push(i);
             }
-            if (currentPage < totalPages - 2) pages.push(-2); // -2 representa "..."
+            if (currentPage < totalPages - 2) pages.push(-2);
             pages.push(totalPages);
         }
 
@@ -459,6 +477,15 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#fff',
         fontWeight: '600',
+    },
+    favoriteIndicator: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        backgroundColor: 'rgba(234, 179, 8, 0.9)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
     },
     cardBody: {
         padding: 12,

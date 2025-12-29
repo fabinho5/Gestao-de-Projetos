@@ -6,7 +6,7 @@ import {
     ScrollView,
     ActivityIndicator,
     TouchableOpacity,
-    Alert,
+    Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +20,11 @@ import {
     Part,
     ApiError,
 } from '../../(services)/partsService';
+import {
+    checkFavorite,
+    addFavorite,
+    removeFavorite,
+} from '../../(services)/favoritesService';
 
 const PartDetails = () => {
     const router = useRouter();
@@ -28,10 +33,23 @@ const PartDetails = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+    const [isFavorite, setIsFavorite] = useState(false);
+    const [favoriteLoading, setFavoriteLoading] = useState(false);
+    const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+    const [showErrorMessage, setShowErrorMessage] = useState(false);
+    const [errorMessageText, setErrorMessageText] = useState('');
+    const fadeAnim = useState(new Animated.Value(0))[0];
 
     useEffect(() => {
         loadPartDetails();
     }, [id]);
+
+    useEffect(() => {
+        if (part?.id) {
+            loadFavoriteStatus();
+        }
+    }, [part]);
 
     const loadPartDetails = async () => {
         try {
@@ -42,9 +60,70 @@ const PartDetails = () => {
         } catch (err) {
             const apiError = err as ApiError;
             setError(apiError.message);
-            Alert.alert('Erro', apiError.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadFavoriteStatus = async () => {
+        try {
+            if (!part?.id) return;
+            const status = await checkFavorite(part.id);
+            setIsFavorite(status);
+        } catch (err) {
+            console.error('Erro ao verificar favorito:', err);
+        }
+    };
+
+    const showMessage = (message: string, isSuccess: boolean) => {
+        if (isSuccess) {
+            setSuccessMessage(message);
+            setShowSuccessMessage(true);
+        } else {
+            setErrorMessageText(message);
+            setShowErrorMessage(true);
+        }
+
+        fadeAnim.setValue(0);
+        Animated.sequence([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+            Animated.delay(2500),
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            if (isSuccess) {
+                setShowSuccessMessage(false);
+            } else {
+                setShowErrorMessage(false);
+            }
+        });
+    };
+
+    const handleToggleFavorite = async () => {
+        if (!part) return;
+
+        try {
+            setFavoriteLoading(true);
+            
+            if (isFavorite) {
+                await removeFavorite(part.id);
+                setIsFavorite(false);
+            } else {
+                await addFavorite(part.id);
+                setIsFavorite(true);
+            }
+        } catch (err) {
+            const apiError = err as ApiError;
+            showMessage(apiError.message, false);
+        } finally {
+            setFavoriteLoading(false);
         }
     };
 
@@ -56,47 +135,12 @@ const PartDetails = () => {
         router.push(`/Parts/editPart?id=${id}`);
     };
 
-    const handleDelete = async () => {
-        // Mostrar confirmação antes de eliminar
-        Alert.alert(
-            'Confirmar Eliminação',
-            'Tem certeza que deseja eliminar esta peça? Esta ação não pode ser desfeita.',
-            [
-                {
-                    text: 'Cancelar',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Eliminar',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            // TODO: Chamar API para eliminar a peça
-                            // await deletePart(id as string);
-                            
-                            // TODO: Mostrar mensagem de sucesso
-                            // Alert.alert('Sucesso', 'Peça eliminada com sucesso');
-                            
-                            // TODO: Redirecionar para a lista de peças
-                            // router.replace('/parts');
-                        } catch (err) {
-                            // TODO: Tratar erro
-                            // const apiError = err as ApiError;
-                            // Alert.alert('Erro', apiError.message);
-                        }
-                    },
-                },
-            ]
-        );
-    };
-
     const handleLogoutPress = async () => {
         try {
             await AsyncStorage.removeItem('userToken');
             router.replace('/login');
         } catch (error) {
             console.error('Erro ao fazer logout:', error);
-            Alert.alert('Erro', 'Não foi possível fazer logout');
         }
     };
 
@@ -129,6 +173,21 @@ const PartDetails = () => {
         <View style={styles.container}>
             <Header onProfilePress={() => router.push('/profile')} onLogoutPress={handleLogoutPress} />
             
+            {/* Mensagens de Sucesso/Erro */}
+            {showSuccessMessage && (
+                <Animated.View style={[styles.messageContainer, styles.successMessage, { opacity: fadeAnim }]}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                    <Text style={styles.successMessageText}>{successMessage}</Text>
+                </Animated.View>
+            )}
+
+            {showErrorMessage && (
+                <Animated.View style={[styles.messageContainer, styles.errorMessage, { opacity: fadeAnim }]}>
+                    <Ionicons name="alert-circle" size={20} color="#ef4444" />
+                    <Text style={styles.errorMessageText}>{errorMessageText}</Text>
+                </Animated.View>
+            )}
+
             <View style={styles.headerBar}>
                 <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#111827" />
@@ -136,6 +195,29 @@ const PartDetails = () => {
                 </TouchableOpacity>
                 
                 <View style={styles.headerActions}>
+                    <TouchableOpacity 
+                        onPress={handleToggleFavorite} 
+                        style={[
+                            styles.favoriteButton,
+                            isFavorite && styles.favoriteButtonActive
+                        ]}
+                        disabled={favoriteLoading}
+                    >
+                        {favoriteLoading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <>
+                                <Ionicons 
+                                    name={isFavorite ? "heart" : "heart-outline"} 
+                                    size={20} 
+                                    color="#fff" 
+                                />
+                                <Text style={styles.actionButtonText}>
+                                    {isFavorite ? 'Remover' : 'Favorito'}
+                                </Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={handleMovement} style={styles.actionButton}>
                         <Ionicons name="swap-horizontal" size={20} color="#fff" />
                         <Text style={styles.actionButtonText}>Movimento</Text>
@@ -143,10 +225,6 @@ const PartDetails = () => {
                     <TouchableOpacity onPress={handleEdit} style={styles.actionButtonPrimary}>
                         <Ionicons name="create-outline" size={20} color="#fff" />
                         <Text style={styles.actionButtonText}>Editar</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={handleDelete} style={styles.actionButtonDelete}>
-                        <Ionicons name="trash-outline" size={20} color="#fff" />
-                        <Text style={styles.actionButtonText}>Eliminar</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -173,6 +251,13 @@ const PartDetails = () => {
                                     {getConditionName(part.condition)}
                                 </Text>
                             </View>
+
+                            {/* Badge de Favorito */}
+                            {isFavorite && (
+                                <View style={styles.favoriteBadge}>
+                                    <Ionicons name="heart" size={16} color="#fff" />
+                                </View>
+                            )}
                         </View>
 
                         {part.images && part.images.length > 1 && (
@@ -302,6 +387,46 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
+    messageContainer: {
+        position: 'absolute',
+        top: 80,
+        left: 16,
+        right: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        borderRadius: 12,
+        zIndex: 1000,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+    },
+    successMessage: {
+        backgroundColor: '#d1fae5',
+        borderWidth: 1,
+        borderColor: '#10b981',
+    },
+    errorMessage: {
+        backgroundColor: '#fee2e2',
+        borderWidth: 1,
+        borderColor: '#ef4444',
+    },
+    successMessageText: {
+        marginLeft: 12,
+        fontSize: 14,
+        color: '#065f46',
+        fontWeight: '600',
+        flex: 1,
+    },
+    errorMessageText: {
+        marginLeft: 12,
+        fontSize: 14,
+        color: '#991b1b',
+        fontWeight: '600',
+        flex: 1,
+    },
     headerBar: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -325,6 +450,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 12,
     },
+    favoriteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#9ca3af',
+        borderRadius: 8,
+    },
+    favoriteButtonActive: {
+        backgroundColor: '#eab308',
+    },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -341,15 +478,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         backgroundColor: '#3b82f6',
-        borderRadius: 8,
-    },
-    actionButtonDelete: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: '#ef4444',
         borderRadius: 8,
     },
     actionButtonText: {
@@ -408,6 +536,17 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#fff',
         fontWeight: '600',
+    },
+    favoriteBadge: {
+        position: 'absolute',
+        top: 12,
+        left: 12,
+        backgroundColor: 'rgba(234, 179, 8, 0.9)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     thumbnailContainer: {
         flexDirection: 'row',
