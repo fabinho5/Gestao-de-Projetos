@@ -49,6 +49,11 @@ interface CancelModal {
     currentStatus: ReservationStatus | null;
 }
 
+interface EditStatusModal {
+    visible: boolean;
+    reservation: Reservation | null;
+}
+
 const Orders = () => {
     const router = useRouter();
     const [allReservations, setAllReservations] = useState<Reservation[]>([]);
@@ -58,6 +63,7 @@ const Orders = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>('all');
+    const [selectedStatus, setSelectedStatus] = useState<ReservationStatus | 'ALL'>('ALL');
     const [userRole, setUserRole] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<ConfirmationModal>({
         visible: false,
@@ -69,6 +75,10 @@ const Orders = () => {
         visible: false,
         reservationId: null,
         currentStatus: null,
+    });
+    const [editStatusModal, setEditStatusModal] = useState<EditStatusModal>({
+        visible: false,
+        reservation: null,
     });
     const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
         visible: false,
@@ -88,20 +98,27 @@ const Orders = () => {
         }, [activeTab])
     );
 
-    // Atualizar filtro de pesquisa
+    // Atualizar filtro de pesquisa e status
     useEffect(() => {
-        if (searchQuery.trim() === '') {
-            setFilteredReservations(allReservations);
-        } else {
-            const filtered = allReservations.filter(reservation =>
+        let filtered = allReservations;
+
+        // Filtrar por status
+        if (selectedStatus !== 'ALL') {
+            filtered = filtered.filter(r => r.status === selectedStatus);
+        }
+
+        // Filtrar por pesquisa
+        if (searchQuery.trim() !== '') {
+            filtered = filtered.filter(reservation =>
                 reservation.part.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 reservation.part.refInternal.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 reservation.user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 reservation.id.toString().includes(searchQuery)
             );
-            setFilteredReservations(filtered);
         }
-    }, [searchQuery, allReservations]);
+
+        setFilteredReservations(filtered);
+    }, [searchQuery, allReservations, selectedStatus]);
 
     // Auto-hide toast
     useEffect(() => {
@@ -145,7 +162,6 @@ const Orders = () => {
             }
 
             setAllReservations(reservations);
-            setFilteredReservations(reservations);
         } catch (err) {
             const apiError = err as ApiError;
             setError(apiError.message);
@@ -180,6 +196,7 @@ const Orders = () => {
     const handleTabChange = (tab: FilterTab) => {
         setActiveTab(tab);
         setSearchQuery('');
+        setSelectedStatus('ALL');
     };
 
     const handleCreateOrder = () => {
@@ -207,34 +224,23 @@ const Orders = () => {
         });
     };
 
-    const handleUpdateStatus = async (reservationId: number, newStatus: ReservationStatus) => {
-        const statusNames: Record<ReservationStatus, string> = {
-            PENDING: 'Pendente',
-            IN_PREPARATION: 'Em Preparação',
-            READY_TO_SHIP: 'Pronto para Envio',
-            COMPLETED: 'Concluído',
-            CONFIRMED: 'Confirmado',
-            CANCELLED: 'Cancelado',
-        };
-
-        setConfirmModal({
+    const handleEditStatus = (reservation: Reservation) => {
+        setEditStatusModal({
             visible: true,
-            title: 'Atualizar Status',
-            message: `Deseja marcar esta reserva como "${statusNames[newStatus]}"?`,
-            confirmText: 'Confirmar',
-            cancelText: 'Cancelar',
-            onConfirm: async () => {
-                try {
-                    await updateReservationStatus(reservationId, newStatus);
-                    showToast('Status atualizado com sucesso', 'success');
-                    loadReservations();
-                } catch (err) {
-                    const apiError = err as ApiError;
-                    showToast(apiError.message, 'error');
-                }
-                setConfirmModal({ ...confirmModal, visible: false });
-            },
+            reservation,
         });
+    };
+
+    const handleUpdateStatusFromModal = async (reservationId: number, newStatus: ReservationStatus) => {
+        try {
+            await updateReservationStatus(reservationId, newStatus);
+            showToast('Status atualizado com sucesso', 'success');
+            loadReservations();
+            setEditStatusModal({ visible: false, reservation: null });
+        } catch (err) {
+            const apiError = err as ApiError;
+            showToast(apiError.message, 'error');
+        }
     };
 
     const handleCancelReservation = async (reservationId: number, currentStatus: ReservationStatus) => {
@@ -257,6 +263,10 @@ const Orders = () => {
         setCancelModal({ visible: false, reservationId: null, currentStatus: null });
     };
 
+    const getStatusCount = (status: ReservationStatus): number => {
+        return allReservations.filter(r => r.status === status).length;
+    };
+
     const renderReservationCard = (reservation: Reservation) => {
         const statusColor = getStatusColor(reservation.status);
         const statusName = getStatusName(reservation.status);
@@ -266,9 +276,14 @@ const Orders = () => {
                 <View style={styles.cardHeader}>
                     <View style={styles.cardHeaderLeft}>
                         <Text style={styles.reservationId}>#{reservation.id}</Text>
-                        <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+                        <TouchableOpacity
+                            style={[styles.statusBadge, { backgroundColor: statusColor }]}
+                            onPress={() => handleEditStatus(reservation)}
+                            activeOpacity={0.7}
+                        >
                             <Text style={styles.statusText}>{statusName}</Text>
-                        </View>
+                            <Ionicons name="create-outline" size={14} color="#fff" style={{ marginLeft: 4 }} />
+                        </TouchableOpacity>
                     </View>
                     <Text style={styles.dateText}>{formatDate(reservation.createdAt)}</Text>
                 </View>
@@ -335,28 +350,6 @@ const Orders = () => {
                         </TouchableOpacity>
                     )}
 
-                    {userRole === 'WAREHOUSE' && 
-                     reservation.status === 'IN_PREPARATION' && (
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.readyButton]}
-                            onPress={() => handleUpdateStatus(reservation.id, 'READY_TO_SHIP')}
-                        >
-                            <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                            <Text style={styles.actionButtonText}>Pronto</Text>
-                        </TouchableOpacity>
-                    )}
-
-                    {userRole === 'WAREHOUSE' && 
-                     reservation.status === 'READY_TO_SHIP' && (
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.completeButton]}
-                            onPress={() => handleUpdateStatus(reservation.id, 'COMPLETED')}
-                        >
-                            <Ionicons name="checkmark-done-outline" size={18} color="#fff" />
-                            <Text style={styles.actionButtonText}>Concluir</Text>
-                        </TouchableOpacity>
-                    )}
-
                     {reservation.status !== 'CANCELLED' && 
                      reservation.status !== 'CONFIRMED' && (
                         <TouchableOpacity
@@ -399,6 +392,16 @@ const Orders = () => {
         );
     }
 
+    const statuses: (ReservationStatus | 'ALL')[] = [
+        'ALL',
+        'PENDING',
+        'IN_PREPARATION',
+        'READY_TO_SHIP',
+        'COMPLETED',
+        'CONFIRMED',
+        'CANCELLED',
+    ];
+
     return (
         <View style={styles.container}>
             <Header onProfilePress={handleProfilePress} onLogoutPress={handleLogoutPress} />
@@ -409,52 +412,98 @@ const Orders = () => {
                 onChangeText={handleSearch}
             />
 
-            <View style={styles.tabsContainer}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'all' && styles.tabActive]}
-                    onPress={() => handleTabChange('all')}
+            {/* Tabs e Status juntos numa linha com scroll horizontal */}
+            <View style={styles.tabsAndStatusContainer}>
+                <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.tabsAndStatusContent}
                 >
-                    <Ionicons 
-                        name="list-outline" 
-                        size={20} 
-                        color={activeTab === 'all' ? '#3b82f6' : '#6b7280'} 
-                    />
-                    <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
-                        Todos
-                    </Text>
-                </TouchableOpacity>
+                    {/* Tabs */}
 
-                {userRole === 'WAREHOUSE' && (
-                    <>
-                        <TouchableOpacity
-                            style={[styles.tab, activeTab === 'pending' && styles.tabActive]}
-                            onPress={() => handleTabChange('pending')}
-                        >
-                            <Ionicons 
-                                name="time-outline" 
-                                size={20} 
-                                color={activeTab === 'pending' ? '#3b82f6' : '#6b7280'} 
-                            />
-                            <Text style={[styles.tabText, activeTab === 'pending' && styles.tabTextActive]}>
-                                Pendentes
-                            </Text>
-                        </TouchableOpacity>
+                    {userRole === 'WAREHOUSE' && (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.tab, activeTab === 'pending' && styles.tabActive]}
+                                onPress={() => handleTabChange('pending')}
+                            >
+                                <Ionicons 
+                                    name="time-outline" 
+                                    size={18} 
+                                    color={activeTab === 'pending' ? '#3b82f6' : '#6b7280'} 
+                                />
+                                <Text style={[styles.tabText, activeTab === 'pending' && styles.tabTextActive]}>
+                                    Pendentes
+                                </Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.tab, activeTab === 'myAssigned' && styles.tabActive]}
-                            onPress={() => handleTabChange('myAssigned')}
-                        >
-                            <Ionicons 
-                                name="person-outline" 
-                                size={20} 
-                                color={activeTab === 'myAssigned' ? '#3b82f6' : '#6b7280'} 
-                            />
-                            <Text style={[styles.tabText, activeTab === 'myAssigned' && styles.tabTextActive]}>
-                                Minhas
-                            </Text>
-                        </TouchableOpacity>
-                    </>
-                )}
+                            <TouchableOpacity
+                                style={[styles.tab, activeTab === 'myAssigned' && styles.tabActive]}
+                                onPress={() => handleTabChange('myAssigned')}
+                            >
+                                <Ionicons 
+                                    name="person-outline" 
+                                    size={18} 
+                                    color={activeTab === 'myAssigned' ? '#3b82f6' : '#6b7280'} 
+                                />
+                                <Text style={[styles.tabText, activeTab === 'myAssigned' && styles.tabTextActive]}>
+                                    Minhas
+                                </Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
+
+                    {/* Separador vertical */}
+                    <View style={styles.separator} />
+
+                    {/* Status filters */}
+                    {statuses.map((status) => {
+                        const isActive = selectedStatus === status;
+                        const count = status === 'ALL' 
+                            ? allReservations.length 
+                            : getStatusCount(status as ReservationStatus);
+                        
+                        const backgroundColor = status === 'ALL' 
+                            ? (isActive ? '#6b7280' : '#f3f4f6')
+                            : (isActive ? getStatusColor(status as ReservationStatus) : '#fff');
+                        
+                        const borderColor = status === 'ALL' 
+                            ? '#6b7280'
+                            : getStatusColor(status as ReservationStatus);
+                        
+                        return (
+                            <TouchableOpacity
+                                key={status}
+                                style={[
+                                    styles.statusFilterChip,
+                                    {
+                                        backgroundColor,
+                                        borderColor,
+                                    }
+                                ]}
+                                onPress={() => setSelectedStatus(status)}
+                            >
+                                <Text style={[
+                                    styles.statusFilterText,
+                                    { color: isActive ? '#fff' : '#374151' }
+                                ]}>
+                                    {status === 'ALL' ? 'Todos' : getStatusName(status as ReservationStatus)}
+                                </Text>
+                                <View style={[
+                                    styles.statusFilterBadge,
+                                    { backgroundColor: isActive ? 'rgba(255, 255, 255, 0.3)' : '#f3f4f6' }
+                                ]}>
+                                    <Text style={[
+                                        styles.statusFilterBadgeText,
+                                        { color: isActive ? '#fff' : '#6b7280' }
+                                    ]}>
+                                        {count}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
             </View>
 
             <View style={styles.statsContainer}>
@@ -477,7 +526,9 @@ const Orders = () => {
                     <View style={styles.emptyContainer}>
                         <Ionicons name="basket-outline" size={64} color="#9ca3af" />
                         <Text style={styles.emptyText}>
-                            {searchQuery ? 'Nenhum pedido encontrado' : 'Nenhum pedido disponível'}
+                            {searchQuery || selectedStatus !== 'ALL' 
+                                ? 'Nenhum pedido encontrado' 
+                                : 'Nenhum pedido disponível'}
                         </Text>
                     </View>
                 ) : (
@@ -485,7 +536,6 @@ const Orders = () => {
                 )}
             </ScrollView>
 
-            {/* Botão Flutuante para Criar Pedido */}
             <TouchableOpacity
                 style={styles.fab}
                 onPress={handleCreateOrder}
@@ -493,6 +543,64 @@ const Orders = () => {
             >
                 <Ionicons name="add" size={28} color="#fff" />
             </TouchableOpacity>
+
+            {/* Modal de Edição de Status */}
+            <Modal
+                transparent
+                visible={editStatusModal.visible}
+                animationType="fade"
+                onRequestClose={() => setEditStatusModal({ visible: false, reservation: null })}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Alterar Status</Text>
+                        <Text style={styles.modalMessage}>
+                            Reserva #{editStatusModal.reservation?.id}
+                        </Text>
+                        
+                        <View style={styles.statusOptionsContainer}>
+                            {(['PENDING', 'IN_PREPARATION', 'READY_TO_SHIP', 'COMPLETED', 'CONFIRMED'] as ReservationStatus[]).map((status) => {
+                                const isCurrentStatus = editStatusModal.reservation?.status === status;
+                                const statusColor = getStatusColor(status);
+                                
+                                return (
+                                    <TouchableOpacity
+                                        key={status}
+                                        style={[
+                                            styles.statusOption,
+                                            { borderColor: statusColor },
+                                            isCurrentStatus && { backgroundColor: statusColor }
+                                        ]}
+                                        onPress={() => {
+                                            if (editStatusModal.reservation && !isCurrentStatus) {
+                                                handleUpdateStatusFromModal(editStatusModal.reservation.id, status);
+                                            }
+                                        }}
+                                        disabled={isCurrentStatus}
+                                    >
+                                        <Text style={[
+                                            styles.statusOptionText,
+                                            isCurrentStatus && styles.statusOptionTextActive
+                                        ]}>
+                                            {getStatusName(status)}
+                                        </Text>
+                                        {isCurrentStatus && (
+                                            <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+
+                        <TouchableOpacity
+                            style={[styles.modalButton, styles.modalButtonCancel, { marginTop: 12 }]}
+                            onPress={() => setEditStatusModal({ visible: false, reservation: null })}
+                        >
+                            <Text style={styles.modalButtonTextCancel}>Fechar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Modal de Confirmação */}
             <Modal
@@ -543,7 +651,6 @@ const Orders = () => {
                                 : 'Selecione o motivo do cancelamento:'}
                         </Text>
                         
-                        {/* Botões de razão de cancelamento */}
                         <View style={styles.cancelReasonButtons}>
                             {cancelModal.currentStatus === 'COMPLETED' ? (
                                 <>
@@ -573,7 +680,6 @@ const Orders = () => {
                             )}
                         </View>
 
-                        {/* Botão Voltar */}
                         <TouchableOpacity
                             style={[styles.modalButton, styles.modalButtonCancel, { marginTop: 12 }]}
                             onPress={() => setCancelModal({ visible: false, reservationId: null, currentStatus: null })}
@@ -634,33 +740,71 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    tabsContainer: {
-        flexDirection: 'row',
+    tabsAndStatusContainer: {
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#e5e7eb',
+    },
+    tabsAndStatusContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 16,
+        paddingVertical: 12,
+        gap: 8,
     },
     tab: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: 'transparent',
+        marginRight: 8,
     },
     tabActive: {
-        borderBottomColor: '#3b82f6',
+        borderColor: '#3b82f6',
+        backgroundColor: '#eff6ff',
     },
     tabText: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 13,
+        fontWeight: '600',
         color: '#6b7280',
     },
     tabTextActive: {
         color: '#3b82f6',
+    },
+    separator: {
+        width: 1,
+        height: 24,
+        backgroundColor: '#e5e7eb',
+        marginHorizontal: 8,
+    },
+    statusFilterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        borderWidth: 2,
+        marginRight: 8,
+    },
+    statusFilterText: {
+        fontSize: 12,
         fontWeight: '600',
+    },
+    statusFilterBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        minWidth: 20,
+        alignItems: 'center',
+    },
+    statusFilterBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
     },
     statsContainer: {
         flexDirection: 'row',
@@ -712,6 +856,8 @@ const styles = StyleSheet.create({
         color: '#111827',
     },
     statusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 12,
         paddingVertical: 4,
         borderRadius: 12,
@@ -776,42 +922,8 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderRadius: 8,
     },
-    cancelReasonButtons: {
-        gap: 12,
-        marginTop: 8,
-    },
-    reasonButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 10,
-        width: '100%',
-    },
-    reasonButtonReturn: {
-        backgroundColor: '#3b82f6',
-    },
-    reasonButtonDamaged: {
-        backgroundColor: '#ef4444',
-    },
-    reasonButtonDesist: {
-        backgroundColor: '#f59e0b',
-    },
-    reasonButtonText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#fff',
-    },
     assignButton: {
         backgroundColor: '#3b82f6',
-    },
-    readyButton: {
-        backgroundColor: '#8b5cf6',
-    },
-    completeButton: {
-        backgroundColor: '#10b981',
     },
     cancelButton: {
         backgroundColor: '#ef4444',
@@ -897,9 +1009,6 @@ const styles = StyleSheet.create({
     modalButtonConfirm: {
         backgroundColor: '#3b82f6',
     },
-    modalButtonDanger: {
-        backgroundColor: '#ef4444',
-    },
     modalButtonTextCancel: {
         fontSize: 16,
         fontWeight: '600',
@@ -907,6 +1016,55 @@ const styles = StyleSheet.create({
     },
     modalButtonTextConfirm: {
         fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    statusOptionsContainer: {
+        gap: 10,
+        marginBottom: 12,
+    },
+    statusOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 10,
+        borderWidth: 2,
+        backgroundColor: '#fff',
+    },
+    statusOptionText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#111827',
+    },
+    statusOptionTextActive: {
+        color: '#fff',
+    },
+    cancelReasonButtons: {
+        gap: 12,
+        marginTop: 8,
+    },
+    reasonButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        width: '100%',
+    },
+    reasonButtonReturn: {
+        backgroundColor: '#3b82f6',
+    },
+    reasonButtonDamaged: {
+        backgroundColor: '#ef4444',
+    },
+    reasonButtonDesist: {
+        backgroundColor: '#f59e0b',
+    },
+    reasonButtonText: {
+        fontSize: 15,
         fontWeight: '600',
         color: '#fff',
     },
