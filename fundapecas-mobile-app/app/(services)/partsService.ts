@@ -99,6 +99,69 @@ const getToken = async (): Promise<string | null> => {
     }
 };
 
+
+export const deletePart = async (ref: string): Promise<void> => {
+    try {
+        console.log(`🗑️ Eliminando peça ${ref}...`);
+        
+        const token = await getToken();
+
+        if (!token) {
+            throw {
+                message: 'Token não encontrado. Faça login novamente.',
+                statusCode: 401,
+            } as ApiError;
+        }
+
+        const response = await fetch(`${API_URL}/parts/${ref}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw {
+                    message: 'Peça não encontrada',
+                    statusCode: 404,
+                } as ApiError;
+            }
+            
+            if (response.status === 401) {
+                throw {
+                    message: 'Sessão expirada. Faça login novamente.',
+                    statusCode: 401,
+                } as ApiError;
+            }
+
+            if (response.status === 403) {
+                throw {
+                    message: 'Não tem permissão para eliminar peças',
+                    statusCode: 403,
+                } as ApiError;
+            }
+            
+            throw {
+                message: 'Erro ao eliminar peça',
+                statusCode: response.status,
+            } as ApiError;
+        }
+
+        console.log('✅ Peça eliminada com sucesso');
+    } catch (error) {
+        if ((error as ApiError).message) {
+            throw error;
+        }
+        
+        console.error('❌ Erro de conexão:', error);
+        throw {
+            message: 'Erro de conexão',
+            statusCode: 0,
+        } as ApiError;
+    }
+};
+
 // ==================== PARTS ====================
 
 export const getPartById = async (id: string | number): Promise<Part> => {

@@ -7,6 +7,7 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     Animated,
+    Modal,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import Header from '../../(shared)/Header';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     getPartById,
+    deletePart,
     formatPrice,
     getConditionName,
     Part,
@@ -35,6 +37,8 @@ const PartDetails = () => {
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [isFavorite, setIsFavorite] = useState(false);
     const [favoriteLoading, setFavoriteLoading] = useState(false);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState(false);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [showErrorMessage, setShowErrorMessage] = useState(false);
@@ -127,6 +131,26 @@ const PartDetails = () => {
         }
     };
 
+    const handleDelete = async () => {
+        if (!part) return;
+
+        setDeleteModalVisible(false);
+
+        try {
+            setDeleteLoading(true);
+            await deletePart(part.refInternal);
+            // Aguardar um pouco para o usuário ver a mensagem
+            setTimeout(() => {
+                router.replace('/parts');
+            }, 1500);
+        } catch (err) {
+            const apiError = err as ApiError;
+            showMessage(apiError.message, false);
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
     const handleBack = () => {
         router.replace('/parts');
     };
@@ -188,6 +212,48 @@ const PartDetails = () => {
                 </Animated.View>
             )}
 
+            {/* Modal de Confirmação de Eliminação */}
+            <Modal
+                transparent
+                visible={deleteModalVisible}
+                animationType="fade"
+                onRequestClose={() => setDeleteModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Ionicons name="warning" size={48} color="#ef4444" />
+                        <Text style={styles.modalTitle}>Eliminar Peça?</Text>
+                        <Text style={styles.modalText}>
+                            Tem certeza que deseja eliminar a peça "{part.name}"?
+                        </Text>
+                        <Text style={styles.modalWarning}>
+                            Esta ação não pode ser desfeita!
+                        </Text>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={styles.modalButtonCancel}
+                                onPress={() => setDeleteModalVisible(false)}
+                                disabled={deleteLoading}
+                            >
+                                <Text style={styles.modalButtonCancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalButtonDelete}
+                                onPress={handleDelete}
+                                disabled={deleteLoading}
+                            >
+                                {deleteLoading ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Text style={styles.modalButtonDeleteText}>Eliminar</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
             <View style={styles.headerBar}>
                 <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#111827" />
@@ -226,6 +292,13 @@ const PartDetails = () => {
                         <Ionicons name="create-outline" size={20} color="#fff" />
                         <Text style={styles.actionButtonText}>Editar</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity 
+                        onPress={() => setDeleteModalVisible(true)} 
+                        style={styles.actionButtonDanger}
+                    >
+                        <Ionicons name="trash-outline" size={20} color="#fff" />
+                        <Text style={styles.actionButtonText}>Eliminar</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -252,7 +325,6 @@ const PartDetails = () => {
                                 </Text>
                             </View>
 
-                            {/* Badge de Favorito */}
                             {isFavorite && (
                                 <View style={styles.favoriteBadge}>
                                     <Ionicons name="heart" size={16} color="#fff" />
@@ -427,6 +499,75 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         flex: 1,
     },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 24,
+        width: '100%',
+        maxWidth: 400,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 10,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#111827',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    modalText: {
+        fontSize: 14,
+        color: '#6b7280',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    modalWarning: {
+        fontSize: 12,
+        color: '#ef4444',
+        textAlign: 'center',
+        fontWeight: '600',
+        marginBottom: 24,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+        width: '100%',
+    },
+    modalButtonCancel: {
+        flex: 1,
+        paddingVertical: 12,
+        backgroundColor: '#f3f4f6',
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    modalButtonCancelText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6b7280',
+    },
+    modalButtonDelete: {
+        flex: 1,
+        paddingVertical: 12,
+        backgroundColor: '#ef4444',
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    modalButtonDeleteText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+    },
     headerBar: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -478,6 +619,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         backgroundColor: '#3b82f6',
+        borderRadius: 8,
+    },
+    actionButtonDanger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#ef4444',
         borderRadius: 8,
     },
     actionButtonText: {
