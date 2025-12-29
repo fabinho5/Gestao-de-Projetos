@@ -463,9 +463,6 @@ const CreatePart = () => {
                                     )}
                                 </Picker>
                             </View>
-                            {locations.length === 0 && (
-                                <Text style={styles.helperText}>⚠️ Nenhuma localização carregada</Text>
-                            )}
                         </View>
                     </View>
                 </View>
