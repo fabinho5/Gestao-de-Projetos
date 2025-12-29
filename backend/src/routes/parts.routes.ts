@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PartsController } from '../controllers/parts.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { requireRole } from '../middlewares/roles.middleware.js';
+import { uploadPartImage } from '../middlewares/upload.middleware.js';
 import { UserRole } from '@prisma/client';
 
 const router = Router();
@@ -75,6 +76,28 @@ router.patch(
   authenticate,
   requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
   PartsController.setVisibility
+);
+
+router.post(
+  '/:ref/images',
+  authenticate,
+  requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
+  uploadPartImage.single('image'),
+  PartsController.addImage
+);
+
+router.delete(
+  '/:ref/images/:imageId',
+  authenticate,
+  requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
+  PartsController.deleteImage
+);
+
+router.patch(
+  '/:ref/images/:imageId/main',
+  authenticate,
+  requireRole(UserRole.WAREHOUSE, UserRole.SALES, UserRole.ADMIN),
+  PartsController.setMainImage
 );
 
 export { router as partsRouter };
