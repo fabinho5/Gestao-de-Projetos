@@ -7,7 +7,7 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     RefreshControl,
-    Alert,
+    Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -33,6 +33,22 @@ import {
 
 type FilterTab = 'all' | 'pending' | 'myAssigned';
 
+interface ConfirmationModal {
+    visible: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+    type?: 'default' | 'danger';
+}
+
+interface CancelModal {
+    visible: boolean;
+    reservationId: number | null;
+    currentStatus: ReservationStatus | null;
+}
+
 const Orders = () => {
     const router = useRouter();
     const [allReservations, setAllReservations] = useState<Reservation[]>([]);
@@ -43,6 +59,22 @@ const Orders = () => {
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>('all');
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [confirmModal, setConfirmModal] = useState<ConfirmationModal>({
+        visible: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
+    const [cancelModal, setCancelModal] = useState<CancelModal>({
+        visible: false,
+        reservationId: null,
+        currentStatus: null,
+    });
+    const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+        visible: false,
+        message: '',
+        type: 'success',
+    });
 
     // Carregar role do utilizador
     useEffect(() => {
@@ -70,6 +102,20 @@ const Orders = () => {
             setFilteredReservations(filtered);
         }
     }, [searchQuery, allReservations]);
+
+    // Auto-hide toast
+    useEffect(() => {
+        if (toast.visible) {
+            const timer = setTimeout(() => {
+                setToast({ ...toast, visible: false });
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast.visible]);
+
+    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+        setToast({ visible: true, message, type });
+    };
 
     const loadUserRole = async () => {
         try {
@@ -136,27 +182,29 @@ const Orders = () => {
         setSearchQuery('');
     };
 
+    const handleCreateOrder = () => {
+        router.push('/Orders/createOrder');
+    };
+
     const handleAssignReservation = async (reservationId: number) => {
-        Alert.alert(
-            'Atribuir Reserva',
-            'Deseja assumir a preparação desta reserva?',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Confirmar',
-                    onPress: async () => {
-                        try {
-                            await assignReservation(reservationId);
-                            Alert.alert('Sucesso', 'Reserva atribuída com sucesso');
-                            loadReservations();
-                        } catch (err) {
-                            const apiError = err as ApiError;
-                            Alert.alert('Erro', apiError.message);
-                        }
-                    },
-                },
-            ]
-        );
+        setConfirmModal({
+            visible: true,
+            title: 'Atribuir Reserva',
+            message: 'Deseja assumir a preparação desta reserva?',
+            confirmText: 'Confirmar',
+            cancelText: 'Cancelar',
+            onConfirm: async () => {
+                try {
+                    await assignReservation(reservationId);
+                    showToast('Reserva atribuída com sucesso', 'success');
+                    loadReservations();
+                } catch (err) {
+                    const apiError = err as ApiError;
+                    showToast(apiError.message, 'error');
+                }
+                setConfirmModal({ ...confirmModal, visible: false });
+            },
+        });
     };
 
     const handleUpdateStatus = async (reservationId: number, newStatus: ReservationStatus) => {
@@ -169,68 +217,44 @@ const Orders = () => {
             CANCELLED: 'Cancelado',
         };
 
-        Alert.alert(
-            'Atualizar Status',
-            `Deseja marcar esta reserva como "${statusNames[newStatus]}"?`,
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Confirmar',
-                    onPress: async () => {
-                        try {
-                            await updateReservationStatus(reservationId, newStatus);
-                            Alert.alert('Sucesso', 'Status atualizado com sucesso');
-                            loadReservations();
-                        } catch (err) {
-                            const apiError = err as ApiError;
-                            Alert.alert('Erro', apiError.message);
-                        }
-                    },
-                },
-            ]
-        );
+        setConfirmModal({
+            visible: true,
+            title: 'Atualizar Status',
+            message: `Deseja marcar esta reserva como "${statusNames[newStatus]}"?`,
+            confirmText: 'Confirmar',
+            cancelText: 'Cancelar',
+            onConfirm: async () => {
+                try {
+                    await updateReservationStatus(reservationId, newStatus);
+                    showToast('Status atualizado com sucesso', 'success');
+                    loadReservations();
+                } catch (err) {
+                    const apiError = err as ApiError;
+                    showToast(apiError.message, 'error');
+                }
+                setConfirmModal({ ...confirmModal, visible: false });
+            },
+        });
     };
 
     const handleCancelReservation = async (reservationId: number, currentStatus: ReservationStatus) => {
-        // Determinar o motivo baseado no status atual
-        const isCompleted = currentStatus === 'COMPLETED';
-        
-        Alert.alert(
-            'Cancelar Reserva',
-            isCompleted 
-                ? 'Esta reserva já foi concluída. Selecione o motivo do cancelamento:'
-                : 'Tem certeza que deseja cancelar esta reserva?',
-            isCompleted ? [
-                { text: 'Voltar', style: 'cancel' },
-                {
-                    text: 'Devolução Normal',
-                    onPress: () => handleCancelWithReason(reservationId, 'RETURN'),
-                },
-                {
-                    text: 'Devolução Danificada',
-                    onPress: () => handleCancelWithReason(reservationId, 'DAMAGED_RETURN'),
-                },
-            ] : [
-                { text: 'Não', style: 'cancel' },
-                {
-                    text: 'Sim, Cancelar',
-                    style: 'destructive',
-                    onPress: () => handleCancelWithReason(reservationId, 'DESIST'),
-                },
-            ]
-        );
+        setCancelModal({
+            visible: true,
+            reservationId,
+            currentStatus,
+        });
     };
 
     const handleCancelWithReason = async (reservationId: number, reason: CancelReason) => {
         try {
-            // Para RETURN, seria necessário pedir locationId, mas por simplicidade vamos omitir
             await cancelReservation(reservationId, { cancelReason: reason });
-            Alert.alert('Sucesso', 'Reserva cancelada com sucesso');
+            showToast('Reserva cancelada com sucesso', 'success');
             loadReservations();
         } catch (err) {
             const apiError = err as ApiError;
-            Alert.alert('Erro', apiError.message);
+            showToast(apiError.message, 'error');
         }
+        setCancelModal({ visible: false, reservationId: null, currentStatus: null });
     };
 
     const renderReservationCard = (reservation: Reservation) => {
@@ -299,7 +323,6 @@ const Orders = () => {
                 </View>
 
                 <View style={styles.cardActions}>
-                    {/* WAREHOUSE pode atribuir reservas pendentes */}
                     {userRole === 'WAREHOUSE' && 
                      reservation.status === 'PENDING' && 
                      !reservation.assignedToId && (
@@ -312,7 +335,6 @@ const Orders = () => {
                         </TouchableOpacity>
                     )}
 
-                    {/* WAREHOUSE pode avançar status das suas reservas */}
                     {userRole === 'WAREHOUSE' && 
                      reservation.status === 'IN_PREPARATION' && (
                         <TouchableOpacity
@@ -335,7 +357,6 @@ const Orders = () => {
                         </TouchableOpacity>
                     )}
 
-                    {/* Botão de cancelar (disponível para vários roles) */}
                     {reservation.status !== 'CANCELLED' && 
                      reservation.status !== 'CONFIRMED' && (
                         <TouchableOpacity
@@ -388,7 +409,6 @@ const Orders = () => {
                 onChangeText={handleSearch}
             />
 
-            {/* Tabs de filtro */}
             <View style={styles.tabsContainer}>
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'all' && styles.tabActive]}
@@ -464,6 +484,117 @@ const Orders = () => {
                     filteredReservations.map(renderReservationCard)
                 )}
             </ScrollView>
+
+            {/* Botão Flutuante para Criar Pedido */}
+            <TouchableOpacity
+                style={styles.fab}
+                onPress={handleCreateOrder}
+                activeOpacity={0.8}
+            >
+                <Ionicons name="add" size={28} color="#fff" />
+            </TouchableOpacity>
+
+            {/* Modal de Confirmação */}
+            <Modal
+                transparent
+                visible={confirmModal.visible}
+                animationType="fade"
+                onRequestClose={() => setConfirmModal({ ...confirmModal, visible: false })}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>{confirmModal.title}</Text>
+                        <Text style={styles.modalMessage}>{confirmModal.message}</Text>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalButtonCancel]}
+                                onPress={() => setConfirmModal({ ...confirmModal, visible: false })}
+                            >
+                                <Text style={styles.modalButtonTextCancel}>
+                                    {confirmModal.cancelText || 'Cancelar'}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalButtonConfirm]}
+                                onPress={confirmModal.onConfirm}
+                            >
+                                <Text style={styles.modalButtonTextConfirm}>
+                                    {confirmModal.confirmText || 'Confirmar'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal de Cancelamento */}
+            <Modal
+                transparent
+                visible={cancelModal.visible}
+                animationType="fade"
+                onRequestClose={() => setCancelModal({ visible: false, reservationId: null, currentStatus: null })}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Cancelar Reserva</Text>
+                        <Text style={styles.modalMessage}>
+                            {cancelModal.currentStatus === 'COMPLETED'
+                                ? 'Esta reserva já foi concluída. Selecione o motivo do cancelamento:'
+                                : 'Selecione o motivo do cancelamento:'}
+                        </Text>
+                        
+                        {/* Botões de razão de cancelamento */}
+                        <View style={styles.cancelReasonButtons}>
+                            {cancelModal.currentStatus === 'COMPLETED' ? (
+                                <>
+                                    <TouchableOpacity
+                                        style={[styles.reasonButton, styles.reasonButtonReturn]}
+                                        onPress={() => handleCancelWithReason(cancelModal.reservationId!, 'RETURN')}
+                                    >
+                                        <Ionicons name="return-down-back" size={20} color="#fff" />
+                                        <Text style={styles.reasonButtonText}>Devolução Normal</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.reasonButton, styles.reasonButtonDamaged]}
+                                        onPress={() => handleCancelWithReason(cancelModal.reservationId!, 'DAMAGED_RETURN')}
+                                    >
+                                        <Ionicons name="warning" size={20} color="#fff" />
+                                        <Text style={styles.reasonButtonText}>Devolução Danificada</Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : (
+                                <TouchableOpacity
+                                    style={[styles.reasonButton, styles.reasonButtonDesist]}
+                                    onPress={() => handleCancelWithReason(cancelModal.reservationId!, 'DESIST')}
+                                >
+                                    <Ionicons name="close-circle" size={20} color="#fff" />
+                                    <Text style={styles.reasonButtonText}>Desistência</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Botão Voltar */}
+                        <TouchableOpacity
+                            style={[styles.modalButton, styles.modalButtonCancel, { marginTop: 12 }]}
+                            onPress={() => setCancelModal({ visible: false, reservationId: null, currentStatus: null })}
+                        >
+                            <Text style={styles.modalButtonTextCancel}>Voltar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Toast */}
+            {toast.visible && (
+                <View style={[styles.toast, toast.type === 'error' && styles.toastError]}>
+                    <Ionicons
+                        name={toast.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                        size={20}
+                        color="#fff"
+                    />
+                    <Text style={styles.toastText}>{toast.message}</Text>
+                </View>
+            )}
         </View>
     );
 };
@@ -645,6 +776,34 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderRadius: 8,
     },
+    cancelReasonButtons: {
+        gap: 12,
+        marginTop: 8,
+    },
+    reasonButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        width: '100%',
+    },
+    reasonButtonReturn: {
+        backgroundColor: '#3b82f6',
+    },
+    reasonButtonDamaged: {
+        backgroundColor: '#ef4444',
+    },
+    reasonButtonDesist: {
+        backgroundColor: '#f59e0b',
+    },
+    reasonButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#fff',
+    },
     assignButton: {
         backgroundColor: '#3b82f6',
     },
@@ -671,6 +830,111 @@ const styles = StyleSheet.create({
         marginTop: 12,
         fontSize: 16,
         color: '#9ca3af',
+    },
+    fab: {
+        position: 'absolute',
+        right: 20,
+        bottom: 20,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#3b82f6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 24,
+        width: '100%',
+        maxWidth: 400,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 12,
+    },
+    modalMessage: {
+        fontSize: 16,
+        color: '#6b7280',
+        lineHeight: 24,
+        marginBottom: 24,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+        flexWrap: 'wrap',
+    },
+    modalButton: {
+        flex: 1,
+        minWidth: 100,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    modalButtonCancel: {
+        backgroundColor: '#f3f4f6',
+    },
+    modalButtonConfirm: {
+        backgroundColor: '#3b82f6',
+    },
+    modalButtonDanger: {
+        backgroundColor: '#ef4444',
+    },
+    modalButtonTextCancel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#6b7280',
+    },
+    modalButtonTextConfirm: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    toast: {
+        position: 'absolute',
+        bottom: 100,
+        left: 20,
+        right: 20,
+        backgroundColor: '#10b981',
+        borderRadius: 12,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+    },
+    toastError: {
+        backgroundColor: '#ef4444',
+    },
+    toastText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#fff',
+        flex: 1,
     },
 });
 
