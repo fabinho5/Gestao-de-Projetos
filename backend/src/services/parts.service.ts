@@ -1,6 +1,12 @@
 import { prisma } from '../lib/prisma.js';
 import { PartCondition, Prisma } from '@prisma/client';
 import { stockMovementService } from './stockMovement.service.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export class NotFoundError extends Error {}
 export class ConflictError extends Error {}
@@ -192,6 +198,86 @@ export class PartsService {
                 specifications: { include: { spec: true } },
                 subReferences: true
             }
+        });
+    }
+
+    static async addImage(ref: string, data: { url: string; isMain?: boolean }) {
+        const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
+        if (!part) throw new NotFoundError('Part not found');
+
+        const created = await prisma.$transaction(async (tx) => {
+            if (data.isMain) {
+                await tx.partImage.updateMany({ where: { partId: part.id, isMain: true }, data: { isMain: false } });
+            }
+
+            return tx.partImage.create({
+                data: { partId: part.id, url: data.url, isMain: data.isMain ?? false },
+            });
+        });
+
+        return prisma.part.findUnique({
+            where: { id: part.id },
+            include: {
+                category: true,
+                location: true,
+                images: true,
+                specifications: { include: { spec: true } },
+                subReferences: true,
+            },
+        });
+    }
+
+    static async deleteImage(ref: string, imageId: number) {
+        const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
+        if (!part) throw new NotFoundError('Part not found');
+
+        const image = await prisma.partImage.findFirst({ where: { id: imageId, partId: part.id } });
+        if (!image) throw new NotFoundError('Image not found');
+
+        await prisma.partImage.delete({ where: { id: imageId } });
+
+        const absolutePath = path.join(__dirname, '..', '..', image.url.replace(/^\//, ''));
+        if (fs.existsSync(absolutePath)) {
+            try {
+                fs.unlinkSync(absolutePath);
+            } catch {
+                // ignore filesystem deletion errors
+            }
+        }
+
+        return prisma.part.findUnique({
+            where: { id: part.id },
+            include: {
+                category: true,
+                location: true,
+                images: true,
+                specifications: { include: { spec: true } },
+                subReferences: true,
+            },
+        });
+    }
+
+    static async setMainImage(ref: string, imageId: number) {
+        const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
+        if (!part) throw new NotFoundError('Part not found');
+
+        const image = await prisma.partImage.findFirst({ where: { id: imageId, partId: part.id } });
+        if (!image) throw new NotFoundError('Image not found');
+
+        await prisma.$transaction(async (tx) => {
+            await tx.partImage.updateMany({ where: { partId: part.id, isMain: true }, data: { isMain: false } });
+            await tx.partImage.update({ where: { id: imageId }, data: { isMain: true } });
+        });
+
+        return prisma.part.findUnique({
+            where: { id: part.id },
+            include: {
+                category: true,
+                location: true,
+                images: true,
+                specifications: { include: { spec: true } },
+                subReferences: true,
+            },
         });
     }
 

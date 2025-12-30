@@ -10,6 +10,9 @@ declare global {
         username: string;
         role: UserRole; // Usa o Enum do Prisma (ADMIN, SALES, etc.)
       };
+
+      file?: Express.Multer.File;
+      files?: Express.Multer.File[] | { [fieldname: string]: Express.Multer.File[] };
     }
   }
 }

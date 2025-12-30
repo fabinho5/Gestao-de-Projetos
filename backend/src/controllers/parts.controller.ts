@@ -28,6 +28,15 @@ const updatePartSchema = createPartSchema.partial().refine(
     { message: 'At least one field must be provided to update' }
 );
 
+const addImageSchema = z.object({
+    isMain: z.preprocess((v) => {
+        if (v === undefined) return undefined;
+        if (v === 'true' || v === '1' || v === true) return true;
+        if (v === 'false' || v === '0' || v === false) return false;
+        return v;
+    }, z.boolean().optional()),
+});
+
 const sortByEnum = z.enum(['name', 'price', 'createdAt', 'updatedAt', 'refInternal']);
 const sortOrderEnum = z.enum(['asc', 'desc']);
 
@@ -232,6 +241,78 @@ export class PartsController {
             }
 
             Logger.error('Error updating part visibility', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    static async addImage(req: Request, res: Response) {
+        try {
+            const { ref } = req.params;
+            const validationError = (req as any).fileValidationError as string | undefined;
+            const validationStatus = (req as any).fileValidationStatus as number | undefined;
+            if (validationError) {
+                return res.status(validationStatus ?? 400).json({ message: validationError });
+            }
+            const payload = addImageSchema.parse(req.body);
+            const file = req.file;
+
+            if (!file) {
+                return res.status(400).json({ message: 'Image file is required (field name: image)' });
+            }
+
+            const url = `/uploads/parts/${ref}/${file.filename}`;
+            const part = await PartsService.addImage(ref, { url, isMain: payload.isMain });
+            res.status(201).json(part);
+        } catch (error: any) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).json({ message: 'Validation failed', errors: error.errors });
+            }
+
+            if (error instanceof NotFoundError) {
+                return res.status(404).json({ message: error.message });
+            }
+
+            Logger.error('Error adding image to part', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    static async deleteImage(req: Request, res: Response) {
+        try {
+            const { ref, imageId } = req.params;
+            const id = Number(imageId);
+            if (!Number.isInteger(id) || id <= 0) {
+                return res.status(400).json({ message: 'Invalid imageId' });
+            }
+
+            const part = await PartsService.deleteImage(ref, id);
+            res.status(200).json(part);
+        } catch (error: any) {
+            if (error instanceof NotFoundError) {
+                return res.status(404).json({ message: error.message });
+            }
+
+            Logger.error('Error deleting image from part', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    static async setMainImage(req: Request, res: Response) {
+        try {
+            const { ref, imageId } = req.params;
+            const id = Number(imageId);
+            if (!Number.isInteger(id) || id <= 0) {
+                return res.status(400).json({ message: 'Invalid imageId' });
+            }
+
+            const part = await PartsService.setMainImage(ref, id);
+            res.status(200).json(part);
+        } catch (error: any) {
+            if (error instanceof NotFoundError) {
+                return res.status(404).json({ message: error.message });
+            }
+
+            Logger.error('Error setting main image for part', error);
             res.status(500).json({ message: 'Internal server error' });
         }
     }
