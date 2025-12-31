@@ -85,8 +85,8 @@ const CreatePart = () => {
     const [description, setDescription] = useState('');
     const [price, setPrice] = useState('');
     const [condition, setCondition] = useState<PartCondition>('NEW');
-    const [categoryId, setCategoryId] = useState<number | null>(null);
-    const [locationId, setLocationId] = useState<number | null>(null);
+    const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
+    const [locationId, setLocationId] = useState<number | undefined>(undefined);
     const [specifications, setSpecifications] = useState<SpecificationValue[]>([]);
     const [subReferences, setSubReferences] = useState<string[]>(['']);
 
@@ -102,27 +102,71 @@ const CreatePart = () => {
     const loadFormData = async () => {
         try {
             setLoadingData(true);
-            const [categoriesData, locationsData, specsData] = await Promise.all([
-                getCategories(),
-                getLocations(),
-                getSpecifications(),
-            ]);
+            
+            // Carregar dados individualmente para melhor controle de erros
+            let categoriesData: Category[] = [];
+            let locationsData: Location[] = [];
+            let specsData: Specification[] = [];
+
+            try {
+                categoriesData = await getCategories();
+                console.log('✅ Categorias carregadas:', categoriesData);
+                console.log('📊 Número de categorias:', categoriesData.length);
+                if (categoriesData.length > 0) {
+                    console.log('📋 Primeira categoria:', categoriesData[0]);
+                }
+            } catch (error) {
+                console.error('❌ Erro ao carregar categorias:', error);
+                showAlert('Erro', 'Não foi possível carregar as categorias', 'error');
+            }
+
+            try {
+                locationsData = await getLocations();
+                console.log('✅ Localizações carregadas:', locationsData);
+                console.log('📊 Número de localizações:', locationsData.length);
+            } catch (error) {
+                console.error('❌ Erro ao carregar localizações:', error);
+                showAlert('Aviso', 'Não foi possível carregar as localizações. Adicione o endpoint no backend.', 'error');
+            }
+
+            try {
+                specsData = await getSpecifications();
+                console.log('✅ Especificações carregadas:', specsData);
+                console.log('📊 Número de especificações:', specsData.length);
+            } catch (error) {
+                console.error('❌ Erro ao carregar especificações:', error);
+            }
+
+            console.log('🔄 Atualizando states...');
             setCategories(categoriesData);
             setLocations(locationsData);
             setAvailableSpecs(specsData);
             
+            console.log('📦 States atualizados');
+            console.log('   - Categorias:', categoriesData.length);
+            console.log('   - Localizações:', locationsData.length);
+            console.log('   - Especificações:', specsData.length);
+            
             // Set default values
             if (categoriesData.length > 0) {
+                console.log('🎯 Definindo categoria padrão:', categoriesData[0].id);
                 setCategoryId(categoriesData[0].id);
+            } else {
+                console.warn('⚠️ Nenhuma categoria disponível para definir como padrão');
             }
+            
             if (locationsData.length > 0) {
+                console.log('🎯 Definindo localização padrão:', locationsData[0].id);
                 setLocationId(locationsData[0].id);
+            } else {
+                console.warn('⚠️ Nenhuma localização disponível para definir como padrão');
             }
         } catch (err) {
             const apiError = err as ApiError;
             showAlert('Erro', apiError.message, 'error');
         } finally {
             setLoadingData(false);
+            console.log('✨ Carregamento concluído');
         }
     };
 
@@ -372,14 +416,26 @@ const CreatePart = () => {
                             <View style={styles.pickerContainer}>
                                 <Picker
                                     selectedValue={categoryId}
-                                    onValueChange={(value) => setCategoryId(value)}
+                                    onValueChange={(value) => {
+                                        console.log('🔄 Categoria selecionada:', value);
+                                        setCategoryId(value);
+                                    }}
                                     style={styles.picker}
+                                    enabled={categories.length > 0}
                                 >
-                                    {categories.map(cat => (
-                                        <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
-                                    ))}
+                                    {categories.length === 0 ? (
+                                        <Picker.Item label="Nenhuma categoria disponível" value={undefined} />
+                                    ) : (
+                                        categories.map(cat => {
+                                            console.log('📋 Renderizando categoria:', cat);
+                                            return <Picker.Item key={cat.id} label={cat.name} value={cat.id} />;
+                                        })
+                                    )}
                                 </Picker>
                             </View>
+                            {categories.length === 0 && (
+                                <Text style={styles.helperText}>⚠️ Nenhuma categoria carregada</Text>
+                            )}
                         </View>
 
                         <View style={[styles.formGroup, styles.formGroupHalf]}>
@@ -387,16 +443,24 @@ const CreatePart = () => {
                             <View style={styles.pickerContainer}>
                                 <Picker
                                     selectedValue={locationId}
-                                    onValueChange={(value) => setLocationId(value)}
+                                    onValueChange={(value) => {
+                                        console.log('🔄 Localização selecionada:', value);
+                                        setLocationId(value);
+                                    }}
                                     style={styles.picker}
+                                    enabled={locations.length > 0}
                                 >
-                                    {locations.map(loc => (
-                                        <Picker.Item 
-                                            key={loc.id} 
-                                            label={`${loc.fullCode} (${loc.capacity - loc._count.parts}/${loc.capacity})`} 
-                                            value={loc.id} 
-                                        />
-                                    ))}
+                                    {locations.length === 0 ? (
+                                        <Picker.Item label="Nenhuma localização disponível" value={undefined} />
+                                    ) : (
+                                        locations.map(loc => (
+                                            <Picker.Item 
+                                                key={loc.id} 
+                                                label={`${loc.fullCode} (${loc.capacity - loc._count.parts}/${loc.capacity})`} 
+                                                value={loc.id} 
+                                            />
+                                        ))
+                                    )}
                                 </Picker>
                             </View>
                         </View>
@@ -682,6 +746,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         textAlign: 'center',
+    },
+    helperText: {
+        fontSize: 12,
+        color: '#ef4444',
+        marginTop: 4,
+        fontStyle: 'italic',
     },
 });
 

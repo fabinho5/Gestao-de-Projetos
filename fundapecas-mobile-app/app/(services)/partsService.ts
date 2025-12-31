@@ -99,6 +99,69 @@ const getToken = async (): Promise<string | null> => {
     }
 };
 
+
+export const deletePart = async (ref: string): Promise<void> => {
+    try {
+        console.log(`🗑️ Eliminando peça ${ref}...`);
+        
+        const token = await getToken();
+
+        if (!token) {
+            throw {
+                message: 'Token não encontrado. Faça login novamente.',
+                statusCode: 401,
+            } as ApiError;
+        }
+
+        const response = await fetch(`${API_URL}/parts/${ref}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw {
+                    message: 'Peça não encontrada',
+                    statusCode: 404,
+                } as ApiError;
+            }
+            
+            if (response.status === 401) {
+                throw {
+                    message: 'Sessão expirada. Faça login novamente.',
+                    statusCode: 401,
+                } as ApiError;
+            }
+
+            if (response.status === 403) {
+                throw {
+                    message: 'Não tem permissão para eliminar peças',
+                    statusCode: 403,
+                } as ApiError;
+            }
+            
+            throw {
+                message: 'Erro ao eliminar peça',
+                statusCode: response.status,
+            } as ApiError;
+        }
+
+        console.log('✅ Peça eliminada com sucesso');
+    } catch (error) {
+        if ((error as ApiError).message) {
+            throw error;
+        }
+        
+        console.error('❌ Erro de conexão:', error);
+        throw {
+            message: 'Erro de conexão',
+            statusCode: 0,
+        } as ApiError;
+    }
+};
+
 // ==================== PARTS ====================
 
 export const getPartById = async (id: string | number): Promise<Part> => {
@@ -269,7 +332,7 @@ export const getPartByRef = async (ref: string): Promise<Part> => {
 
 export const createPart = async (data: CreatePartData): Promise<Part> => {
     try {
-        console.log('📝 Criando nova peça...');
+        console.log('🆕 Criando nova peça...');
         
         const token = await getToken();
 
@@ -349,8 +412,10 @@ export const createPart = async (data: CreatePartData): Promise<Part> => {
 export const getCategories = async (): Promise<Category[]> => {
     try {
         console.log('📂 Carregando categorias...');
+        console.log('🔗 URL:', `${API_URL}/parts/categories/list`);
         
         const token = await getToken();
+        console.log('🔑 Token obtido:', token ? 'Sim' : 'Não');
 
         if (!token) {
             throw {
@@ -359,14 +424,19 @@ export const getCategories = async (): Promise<Category[]> => {
             } as ApiError;
         }
 
-        const response = await fetch(`${API_URL}/categories`, {
+        const response = await fetch(`${API_URL}/parts/categories/list`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
         });
 
+        console.log('📡 Status da resposta:', response.status);
+
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Erro na resposta:', errorText);
+            
             if (response.status === 401) {
                 throw {
                     message: 'Sessão expirada. Faça login novamente.',
@@ -374,24 +444,33 @@ export const getCategories = async (): Promise<Category[]> => {
                 } as ApiError;
             }
             
+            if (response.status === 404) {
+                throw {
+                    message: 'Endpoint de categorias não encontrado. Verifique a rota no backend.',
+                    statusCode: 404,
+                } as ApiError;
+            }
+            
             throw {
-                message: 'Erro ao carregar categorias',
+                message: `Erro ao carregar categorias (${response.status})`,
                 statusCode: response.status,
             } as ApiError;
         }
 
         const data = await response.json();
         console.log('✅ Categorias carregadas:', data.length);
+        console.log('📋 Categorias:', data);
         
         return data;
     } catch (error) {
+        console.error('❌ Erro completo:', error);
+        
         if ((error as ApiError).message) {
             throw error;
         }
         
-        console.error('❌ Erro de conexão:', error);
         throw {
-            message: 'Erro de conexão',
+            message: 'Erro de conexão. Verifique se o backend está rodando.',
             statusCode: 0,
         } as ApiError;
     }
@@ -402,6 +481,7 @@ export const getCategories = async (): Promise<Category[]> => {
 export const getLocations = async (): Promise<Location[]> => {
     try {
         console.log('📍 Carregando localizações...');
+        console.log('🔗 URL:', `${API_URL}/parts/locations/list`);
         
         const token = await getToken();
 
@@ -412,14 +492,19 @@ export const getLocations = async (): Promise<Location[]> => {
             } as ApiError;
         }
 
-        const response = await fetch(`${API_URL}/locations`, {
+        const response = await fetch(`${API_URL}/parts/locations/list`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
         });
 
+        console.log('📡 Status da resposta:', response.status);
+
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Erro na resposta:', errorText);
+            
             if (response.status === 401) {
                 throw {
                     message: 'Sessão expirada. Faça login novamente.',
@@ -427,8 +512,15 @@ export const getLocations = async (): Promise<Location[]> => {
                 } as ApiError;
             }
             
+            if (response.status === 404) {
+                throw {
+                    message: 'Endpoint de localizações não encontrado. Verifique a rota no backend.',
+                    statusCode: 404,
+                } as ApiError;
+            }
+            
             throw {
-                message: 'Erro ao carregar localizações',
+                message: `Erro ao carregar localizações (${response.status})`,
                 statusCode: response.status,
             } as ApiError;
         }
@@ -438,11 +530,12 @@ export const getLocations = async (): Promise<Location[]> => {
         
         return data;
     } catch (error) {
+        console.error('❌ Erro completo:', error);
+        
         if ((error as ApiError).message) {
             throw error;
         }
         
-        console.error('❌ Erro de conexão:', error);
         throw {
             message: 'Erro de conexão',
             statusCode: 0,
@@ -455,6 +548,7 @@ export const getLocations = async (): Promise<Location[]> => {
 export const getSpecifications = async (): Promise<Specification[]> => {
     try {
         console.log('📋 Carregando especificações...');
+        console.log('🔗 URL:', `${API_URL}/parts/specifications/list`);
         
         const token = await getToken();
 
@@ -465,14 +559,19 @@ export const getSpecifications = async (): Promise<Specification[]> => {
             } as ApiError;
         }
 
-        const response = await fetch(`${API_URL}/specifications`, {
+        const response = await fetch(`${API_URL}/parts/specifications/list`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
         });
 
+        console.log('📡 Status da resposta:', response.status);
+
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Erro na resposta:', errorText);
+            
             if (response.status === 401) {
                 throw {
                     message: 'Sessão expirada. Faça login novamente.',
@@ -480,8 +579,15 @@ export const getSpecifications = async (): Promise<Specification[]> => {
                 } as ApiError;
             }
             
+            if (response.status === 404) {
+                throw {
+                    message: 'Endpoint de especificações não encontrado. Verifique a rota no backend.',
+                    statusCode: 404,
+                } as ApiError;
+            }
+            
             throw {
-                message: 'Erro ao carregar especificações',
+                message: `Erro ao carregar especificações (${response.status})`,
                 statusCode: response.status,
             } as ApiError;
         }
@@ -491,11 +597,12 @@ export const getSpecifications = async (): Promise<Specification[]> => {
         
         return data;
     } catch (error) {
+        console.error('❌ Erro completo:', error);
+        
         if ((error as ApiError).message) {
             throw error;
         }
         
-        console.error('❌ Erro de conexão:', error);
         throw {
             message: 'Erro de conexão',
             statusCode: 0,
