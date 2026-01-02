@@ -51,6 +51,7 @@ export default function Header({
       <View style={styles.actionsContainer}>
 
         <TouchableOpacity 
+          testID="header-trigger"
           onPress={() => {
             console.log("Ícone clicado");
             setMenuVisible(true);
@@ -81,6 +82,7 @@ export default function Header({
         >
           <Pressable style={styles.menu} onPress={(e) => e.stopPropagation()}>
             <TouchableOpacity
+              testID="profile-button"
               style={styles.menuItem}
               onPress={handleProfile}
               activeOpacity={0.7}
@@ -91,6 +93,7 @@ export default function Header({
             <View style={styles.separator} />
 
             <TouchableOpacity
+              testID="logout-button"
               style={styles.menuItem}
               onPress={handleLogout}
               activeOpacity={0.7}
