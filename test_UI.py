@@ -6,7 +6,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException
-import mysql.connector  # <--- Add this
+import mysql.connector 
+
 
 
 DB_CONFIG = {
@@ -47,9 +48,9 @@ def setup_test_user():
         cursor.execute(query, ("joaoTest", TEST_USER["email"], hashed_pw, TEST_USER["full_name"], "ADMIN", True, hashed_pw))
         
         conn.commit()
-        print("✅ DB: Test user ready.")
+        print("DB: Test user ready.")
     except Exception as e:
-        print(f"❌ DB Error: {e}")
+        print(f"DB Error: {e}")
     finally:
         if 'conn' in locals():
             conn.close()
@@ -73,9 +74,9 @@ def teardown_test_user():
         cursor.execute("DELETE FROM users WHERE email = %s", ("joaoTest@test.com",))
         
         conn.commit()
-        print("✅ DB: Test user deleted successfully.")
+        print("DB: Test user deleted successfully.")
     except Exception as e:
-        print(f"⚠️ Teardown Warning: {e}")
+        print(f"Teardown Warning: {e}")
     finally:
         if conn:
             cursor.close()
@@ -108,7 +109,7 @@ def test_success_authentication_realUser():
         wait.until(EC.url_contains("/home"))
 
     except Exception as e:
-        print(f"❌ TEST FAILED: {e}")
+        print(f" TEST FAILED: {e}")
         driver.save_screenshot("login_failure.png")
     finally:
         # 5. Clean up
