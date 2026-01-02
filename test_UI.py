@@ -247,6 +247,40 @@ def test_profile_password_change():
         driver.quit()
 
 
+def test_unsuccess_authentication_manytimes_error():
+    driver = webdriver.Chrome()
+    driver.get("http://localhost:8081/login")
+    wait = WebDriverWait(driver, 10)
+
+    try:
+        for i in range(11):
+            print("Added username")
+            send_keys_safely(wait, '[data-testid="username-input"]', "wronguser")
+
+            print("Added password")
+            send_keys_safely(wait, '[data-testid="password-input"]', "wrongpassword")
+
+            print("Clicked login")
+            login_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '[data-testid="login-button"]')))
+            login_btn.click()
+
+            error_element = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="error_message"]'))
+            )
+            target_text_es = 'Too many login attempts, please try again later.'
+            target_text_pt = 'Demasiadas tentativas. Aguarda alguns minutos.'
+            error_text = error_element.text
+            print(error_text)
+            if error_text == target_text_es or error_text == target_text_pt:
+                print("SUCESS: Detected rate limit error message.")
+                return
+
+        print(f"Detected error message: '{error_text}'")
+
+    except Exception as e:
+        print(f"Test failed: {e}")
+    finally:
+        driver.quit()
 
 
 
@@ -263,3 +297,6 @@ if __name__ == "__main__":
 
     # Test password change & login with new password
     test_profile_password_change()
+
+    # 'Demasiadas tentativas. Aguarda alguns minutos.'
+    test_unsuccess_authentication_manytimes_error()

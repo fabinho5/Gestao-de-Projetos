@@ -165,9 +165,9 @@ export default function LoginScreen() {
 
                             {/* Mensagem de Erro */}
                             {errorMessage ? (
-                                <View testID = "error_message" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex-row items-center">
+                                <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex-row items-center">
                                     <Ionicons name="alert-circle-outline" size={20} color="#dc2626" />
-                                    <Text className="text-red-600 text-sm ml-2 flex-1">
+                                    <Text testID = "error_message" className="text-red-600 text-sm ml-2 flex-1">
                                         {errorMessage}
                                     </Text>
                                 </View>
