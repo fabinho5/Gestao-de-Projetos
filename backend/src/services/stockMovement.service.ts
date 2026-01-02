@@ -1,5 +1,6 @@
 import { MovementType, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { auditLogService } from './auditLog.service.js';
 
 // Tipo para transações Prisma
 type TransactionClient = Prisma.TransactionClient;
@@ -131,6 +132,17 @@ async function recordEntry(partId: number, userId: number, locationId: number) {
       where: { id: partId },
       data: { locationId }
     });
+
+    await auditLogService.record({
+      userId,
+      action: 'STOCK_ENTRY',
+      entity: 'PART',
+      entityId: partId,
+      details: {
+        movementId: movement.id,
+        locationId,
+      },
+    }, tx);
     
     return movement;
   });
@@ -168,6 +180,17 @@ async function recordExit(partId: number, userId: number) {
       where: { id: partId },
       data: { locationId: null }
     });
+
+    await auditLogService.record({
+      userId,
+      action: 'STOCK_EXIT',
+      entity: 'PART',
+      entityId: partId,
+      details: {
+        movementId: movement.id,
+        sourceLocId: part.locationId,
+      },
+    }, tx);
     
     return movement;
   });
@@ -217,6 +240,18 @@ async function recordTransfer(params: TransferParams) {
       where: { id: partId },
       data: { locationId: toLocationId }
     });
+
+    await auditLogService.record({
+      userId,
+      action: 'STOCK_TRANSFER',
+      entity: 'PART',
+      entityId: partId,
+      details: {
+        movementId: movement.id,
+        fromLocationId,
+        toLocationId,
+      },
+    }, tx);
     
     return movement;
   });
@@ -251,6 +286,17 @@ async function recordReturn(params: ReturnParams) {
           locationId: null
         }
       });
+
+      await auditLogService.record({
+        userId,
+        action: 'STOCK_RETURN',
+        entity: 'PART',
+        entityId: partId,
+        details: {
+          movementId: movement.id,
+          isDamaged: true,
+        },
+      }, tx);
       
       return movement;
     });
@@ -285,6 +331,18 @@ async function recordReturn(params: ReturnParams) {
       where: { id: partId },
       data: { locationId: toLocationId }
     });
+
+    await auditLogService.record({
+      userId,
+      action: 'STOCK_RETURN',
+      entity: 'PART',
+      entityId: partId,
+      details: {
+        movementId: movement.id,
+        toLocationId,
+        isDamaged: false,
+      },
+    }, tx);
     
     return movement;
   });
@@ -334,6 +392,18 @@ async function recordAdjustment(
       where: { id: partId },
       data: { locationId: newLocationId }
     });
+
+    await auditLogService.record({
+      userId,
+      action: 'STOCK_ADJUSTMENT',
+      entity: 'PART',
+      entityId: partId,
+      details: {
+        movementId: movement.id,
+        fromLocationId: part.locationId,
+        toLocationId: newLocationId,
+      },
+    }, tx);
     
     return movement;
   });
