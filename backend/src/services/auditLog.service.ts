@@ -23,7 +23,9 @@ export type AuditLogFilters = {
 
 type AuditClient = PrismaClient | Prisma.TransactionClient;
 
+// Centralizes audit log persistence and querying so every module follows the same rules.
 class AuditLogService {
+  // Writes a single audit entry, optionally sharing an existing Prisma transaction.
   async record(
     params: RecordAuditLogParams,
     client: AuditClient = prisma
@@ -41,6 +43,7 @@ class AuditLogService {
     });
   }
 
+  // Returns a paginated, filterable list of audit entries for the admin UI.
   async getLogs(filters: AuditLogFilters = {}) {
     const page = filters.page && filters.page > 0 ? filters.page : 1;
     const rawPageSize = filters.pageSize && filters.pageSize > 0 ? filters.pageSize : 25;
@@ -114,6 +117,7 @@ class AuditLogService {
     };
   }
 
+  // Fetches one audit entry including basic user info for drill-down views.
   async getLogById(id: number) {
     return prisma.auditLog.findUnique({
       where: { id },

@@ -53,6 +53,7 @@ export class ReservationsService {
             }
         });
 
+        // Log every reservation creation with the originating user and status.
         await auditLogService.record({
             userId,
             action: 'RESERVATION_CREATE',
@@ -163,6 +164,7 @@ export class ReservationsService {
             }
         });
 
+        // Record which warehouse user picked up the work and when the status moved.
         await auditLogService.record({
             userId: warehouseUserId,
             action: 'RESERVATION_ASSIGN',
@@ -228,6 +230,7 @@ export class ReservationsService {
             await stockMovementService.recordExit(reservation.partId, userId);
         }
 
+        // Persist status transitions to keep a clear timeline of reservation progress.
         await auditLogService.record({
             userId,
             action: 'RESERVATION_STATUS',
@@ -318,6 +321,7 @@ export class ReservationsService {
             }
         });
 
+        // Capture cancellations, reasons, and return logistics for auditing.
         await auditLogService.record({
             userId,
             action: 'RESERVATION_CANCEL',

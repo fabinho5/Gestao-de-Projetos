@@ -133,6 +133,7 @@ async function recordEntry(partId: number, userId: number, locationId: number) {
       data: { locationId }
     });
 
+    // Log the entry so we know how the part entered inventory.
     await auditLogService.record({
       userId,
       action: 'STOCK_ENTRY',
@@ -181,6 +182,7 @@ async function recordExit(partId: number, userId: number) {
       data: { locationId: null }
     });
 
+    // Track exits to tie shipped parts back to the user who completed the reservation.
     await auditLogService.record({
       userId,
       action: 'STOCK_EXIT',
@@ -241,6 +243,7 @@ async function recordTransfer(params: TransferParams) {
       data: { locationId: toLocationId }
     });
 
+    // Record transfers to document the from/to locations for each move.
     await auditLogService.record({
       userId,
       action: 'STOCK_TRANSFER',
@@ -287,6 +290,7 @@ async function recordReturn(params: ReturnParams) {
         }
       });
 
+      // Note damaged returns so we can justify why the part is hidden and locationless.
       await auditLogService.record({
         userId,
         action: 'STOCK_RETURN',
@@ -332,6 +336,7 @@ async function recordReturn(params: ReturnParams) {
       data: { locationId: toLocationId }
     });
 
+    // Record standard returns, including the new storage location.
     await auditLogService.record({
       userId,
       action: 'STOCK_RETURN',
@@ -393,6 +398,7 @@ async function recordAdjustment(
       data: { locationId: newLocationId }
     });
 
+    // Capture manual adjustments to pinpoint who corrected the stored location.
     await auditLogService.record({
       userId,
       action: 'STOCK_ADJUSTMENT',

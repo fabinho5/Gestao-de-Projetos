@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { auditLogService } from '../services/auditLog.service.js';
 import { Logger } from '../utils/logger.js';
 
+// Allow optional ISO date strings (blank values are ignored) for range filtering.
 const optionalDate = z
   .preprocess((val) => {
     if (val === undefined || val === null || val === '') return undefined;
@@ -22,9 +23,11 @@ const listSchema = z.object({
   dateTo: optionalDate,
 });
 
+// HTTP handlers that expose the audit log querying capabilities to admins.
 export class AuditLogController {
   static async getLogs(req: Request, res: Response) {
     try {
+      // Parse and validate query filters before hitting the service layer.
       const filters = listSchema.parse(req.query);
       const result = await auditLogService.getLogs(filters);
       return res.status(200).json(result);
@@ -45,6 +48,7 @@ export class AuditLogController {
         return res.status(400).json({ message: 'Invalid log id' });
       }
 
+      // Fetch a single log entry to inspect its payload and associated user.
       const log = await auditLogService.getLogById(id);
       if (!log) {
         return res.status(404).json({ message: 'Audit log not found' });

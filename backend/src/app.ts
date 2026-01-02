@@ -26,6 +26,7 @@ app.use('/auth', authRouter);
 app.use('/favorites', favoritesRouter);
 app.use('/reservations', reservationsRouter);
 app.use('/stock-movements', stockMovementRouter);
+// Admin-only audit log endpoints for compliance reviews.
 app.use('/audit-logs', auditLogRouter);
 
 export { app };

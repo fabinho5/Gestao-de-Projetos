@@ -201,6 +201,7 @@ export class PartsService {
             }
         });
 
+        // Record every visibility toggle so we know who hid or exposed a part.
         await auditLogService.record({
             userId: updatedByUserId,
             action: 'PART_VISIBILITY',
@@ -374,6 +375,7 @@ export class PartsService {
                 ...(subReferences ? ['subReferences'] : []),
             ];
 
+            // Log the field changes so auditors can spot what was edited.
             await auditLogService.record({
                 userId: updatedByUserId,
                 action: 'PART_UPDATE',
@@ -463,6 +465,7 @@ export class PartsService {
             });
 
             await stockMovementService.recordEntry(newpart.id, createdByUserId, data.locationId);
+            // Capture the creation event together with the key attributes.
             await auditLogService.record({
                 userId: createdByUserId,
                 action: 'PART_CREATE',
@@ -505,6 +508,7 @@ export class PartsService {
             data: { deletedAt: new Date(), isVisible: false }
         });
 
+        // Track soft deletes to know who removed an item from circulation.
         await auditLogService.record({
             userId: deletedByUserId,
             action: 'PART_DELETE',
