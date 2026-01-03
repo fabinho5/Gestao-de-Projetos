@@ -9,6 +9,7 @@ import { authRouter } from './routes/auth.routes.js';
 import { favoritesRouter } from './routes/favorites.routes.js';
 import { reservationsRouter } from './routes/reservations.routes.js';
 import { stockMovementRouter } from './routes/stockMovement.routes.js';
+import { auditLogRouter } from './routes/auditLog.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,5 +26,7 @@ app.use('/auth', authRouter);
 app.use('/favorites', favoritesRouter);
 app.use('/reservations', reservationsRouter);
 app.use('/stock-movements', stockMovementRouter);
+// Admin-only audit log endpoints for compliance reviews.
+app.use('/audit-logs', auditLogRouter);
 
 export { app };

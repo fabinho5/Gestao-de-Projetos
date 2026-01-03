@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { ReservationStatus, CancelReason } from '@prisma/client';
 import { stockMovementService } from './stockMovement.service.js';
+import { auditLogService } from './auditLog.service.js';
 
 export class ReservationsService {
 
@@ -50,6 +51,19 @@ export class ReservationsService {
                 user: { select: { id: true, username: true, fullName: true } },
                 part: { select: { id: true, name: true, refInternal: true } }
             }
+        });
+
+        // Log every reservation creation with the originating user and status.
+        await auditLogService.record({
+            userId,
+            action: 'RESERVATION_CREATE',
+            entity: 'RESERVATION',
+            entityId: reservation.id,
+            details: {
+                partId,
+                status: reservation.status,
+                notes: notes ?? null,
+            },
         });
 
         return reservation;
@@ -150,6 +164,19 @@ export class ReservationsService {
             }
         });
 
+        // Record which warehouse user picked up the work and when the status moved.
+        await auditLogService.record({
+            userId: warehouseUserId,
+            action: 'RESERVATION_ASSIGN',
+            entity: 'RESERVATION',
+            entityId: reservationId,
+            details: {
+                previousStatus: reservation.status,
+                newStatus: updated.status,
+                assignedToId: warehouseUserId,
+            },
+        });
+
         return updated;
     }
 
@@ -202,6 +229,19 @@ export class ReservationsService {
         if (newStatus === ReservationStatus.COMPLETED) {
             await stockMovementService.recordExit(reservation.partId, userId);
         }
+
+        // Persist status transitions to keep a clear timeline of reservation progress.
+        await auditLogService.record({
+            userId,
+            action: 'RESERVATION_STATUS',
+            entity: 'RESERVATION',
+            entityId: reservationId,
+            details: {
+                previousStatus: reservation.status,
+                newStatus,
+                partId: reservation.partId,
+            },
+        });
 
         return updated;
     }
@@ -279,6 +319,20 @@ export class ReservationsService {
                 part: { select: { id: true, name: true, refInternal: true } },
                 returnLocation: true
             }
+        });
+
+        // Capture cancellations, reasons, and return logistics for auditing.
+        await auditLogService.record({
+            userId,
+            action: 'RESERVATION_CANCEL',
+            entity: 'RESERVATION',
+            entityId: reservationId,
+            details: {
+                cancelReason,
+                wasCompleted,
+                partId: reservation.partId,
+                returnLocationId: returnLocationId ?? null,
+            },
         });
 
         return updated;
