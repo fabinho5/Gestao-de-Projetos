@@ -170,6 +170,9 @@ export class AuthController {
 
     static async register(req: Request, res: Response) {
         try {
+            const actor = req.user;
+            if (!actor) return res.status(401).json({ message: 'Not authenticated' });
+
             const { username, email, fullName, password, role } = req.body;
 
             // Validação de inputs
@@ -193,8 +196,15 @@ export class AuthController {
                 return res.status(400).json({ message: `Invalid role. Must be one of: ${Object.values(UserRole).join(', ')}` });
             }
 
-            const newUser = await AuthService.register(username.trim(), email?.trim() || null, fullName.trim(), password, role);
-            Logger.info(`User registered (username=${username}, id=${newUser.id}, role=${role}, adminId=${req.user?.id}, reqId=${req.headers['x-request-id'] || 'n/a'})`);
+            const newUser = await AuthService.register(
+                username.trim(),
+                email?.trim() || null,
+                fullName.trim(),
+                password,
+                role,
+                actor.id
+            );
+            Logger.info(`User registered (username=${username}, id=${newUser.id}, role=${role}, adminId=${actor.id}, reqId=${req.headers['x-request-id'] || 'n/a'})`);
             return res.status(201).json(newUser);
 
         } catch (error: any) {

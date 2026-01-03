@@ -34,6 +34,9 @@ Audit Action Reference
 - **USER_UPDATE**: Fired when an admin edits another user via `UsersService.updateUser()`.
 - **USER_DEACTIVATE**: Recorded when `UsersService.deactivateUser()` disables an account and clears refresh tokens.
 - **USER_ACTIVATE**: Triggered when `UsersService.activateUser()` re-enables an account.
+- **USER_CREATE**: Emitted from `AuthService.register()` whenever an admin provisions a new account.
+- **USER_PASSWORD_CHANGE**: Logged inside `AuthService.changePassword()` after a user updates their own password.
+- **USER_PASSWORD_RESET**: Recorded when `AuthService.adminResetPassword()` allows an admin to set a new password for someone else.
 
 Thunder Client Test Matrix
 --------------------------
@@ -88,13 +91,34 @@ Use an ADMIN token unless stated otherwise. For each request, duplicate it to tr
    - PATCH http://localhost:3002/users/5/activate
    Expected: USER_UPDATE / USER_DEACTIVATE / USER_ACTIVATE entries referencing the target user id.
 
-6. Audit log exploration (ADMIN only)
+6. Auth-admin actions
+   - POST http://localhost:3002/auth/register
+     Body: { "username": "newuser", "email": "new@demo.com", "fullName": "New User", "password": "Abc123", "role": "SALES" }
+   - POST http://localhost:3002/auth/change-password (run as the created user with its own token)
+     Body: { "oldPassword": "Abc123!@#", "newPassword": "Xpto456!@#" }
+   - POST http://localhost:3002/auth/admin-reset-password
+     Body: { "userId": <id>, "newPassword": "Reset789!@#" }
+   Expected: USER_CREATE tied to the admin id, USER_PASSWORD_CHANGE tied to the acting user, and USER_PASSWORD_RESET tied to the admin + target.
+
+7. Audit log exploration (ADMIN only)
    - GET http://localhost:3002/audit-logs?page=1&pageSize=20
    - GET http://localhost:3002/audit-logs?userId=1&action=PART&entity=PART
    - GET http://localhost:3002/audit-logs?search=TEST-001
    - GET http://localhost:3002/audit-logs?dateFrom=2025-12-31T00:00:00.000Z&dateTo=2026-01-02T23:59:59.000Z
    - GET http://localhost:3002/audit-logs/1
    Expected: responses contain pagination metadata plus nested user info; invalid filters return 400 with validation details.
+
+Full Overnight Regression
+-------------------------
+Run the following chain in one sitting to confirm every log rolls in correctly (refresh tokens as needed between role switches):
+1. Admin login ➜ capture token.
+2. Parts lifecycle suite (section 2).
+3. Reservations workflow (section 3).
+4. Stock movement operations (section 4).
+5. User management adjustments (section 5).
+6. Auth-admin scenarios: admin creates a user, new user changes password, admin resets it again (section 6). Remember to log in as the new user for the self-service step.
+7. Hit `/audit-logs` twice: once with broad filters, once scoped to each new action (e.g., `action=USER_CREATE`, `action=USER_PASSWORD_CHANGE`, etc.) to ensure every entry is persisted.
+8. Note timestamps and request IDs—if any action is missing, re-run the corresponding endpoint immediately.
 
 Execution Tips
 --------------
