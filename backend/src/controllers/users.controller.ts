@@ -7,6 +7,9 @@ export class UsersController {
 
     static async getAllUsers(req: Request, res: Response) {
         try {
+            const actor = req.user;
+            if (!actor) return res.status(401).json({ message: 'Not authenticated' });
+
             const { role, isActive } = req.query;
 
             const filters: any = {};
@@ -18,7 +21,7 @@ export class UsersController {
             }
 
             const users = await UsersService.getAllUsers(filters);
-            Logger.info(`Admin ${req.user?.username} listed users (count=${users.length}, reqId=${req.headers['x-request-id'] || 'n/a'})`);
+            Logger.info(`Admin ${actor.username} listed users (count=${users.length}, reqId=${req.headers['x-request-id'] || 'n/a'})`);
             return res.status(200).json(users);
 
         } catch (error: any) {
@@ -29,6 +32,9 @@ export class UsersController {
 
     static async getUserById(req: Request, res: Response) {
         try {
+            const actor = req.user;
+            if (!actor) return res.status(401).json({ message: 'Not authenticated' });
+
             const { id } = req.params;
             const userId = parseInt(id);
 
@@ -37,7 +43,7 @@ export class UsersController {
             }
 
             const user = await UsersService.getUserById(userId);
-            Logger.info(`Admin ${req.user?.username} viewed user ${id} (reqId=${req.headers['x-request-id'] || 'n/a'})`);
+            Logger.info(`Admin ${actor.username} viewed user ${id} (reqId=${req.headers['x-request-id'] || 'n/a'})`);
             return res.status(200).json(user);
 
         } catch (error: any) {
@@ -53,6 +59,9 @@ export class UsersController {
 
     static async updateUser(req: Request, res: Response) {
         try {
+            const actor = req.user;
+            if (!actor) return res.status(401).json({ message: 'Not authenticated' });
+
             const { id } = req.params;
             const { username, email, fullName, role } = req.body;
             const userId = parseInt(id);
@@ -69,8 +78,8 @@ export class UsersController {
                 return res.status(400).json({ message: `Invalid role. Must be one of: ${Object.values(UserRole).join(', ')}` });
             }
 
-            const updatedUser = await UsersService.updateUser(userId, { username, email, fullName, role });
-            Logger.info(`Admin ${req.user?.username} updated user ${id} (reqId=${req.headers['x-request-id'] || 'n/a'})`);
+            const updatedUser = await UsersService.updateUser(userId, { username, email, fullName, role }, actor.id);
+            Logger.info(`Admin ${actor.username} updated user ${id} (reqId=${req.headers['x-request-id'] || 'n/a'})`);
             return res.status(200).json(updatedUser);
 
         } catch (error: any) {
@@ -94,6 +103,9 @@ export class UsersController {
 
     static async deactivateUser(req: Request, res: Response) {
         try {
+            const actor = req.user;
+            if (!actor) return res.status(401).json({ message: 'Not authenticated' });
+
             const { id } = req.params;
             const userId = parseInt(id);
 
@@ -101,8 +113,8 @@ export class UsersController {
                 return res.status(400).json({ message: 'Invalid user ID' });
             }
 
-            const deactivatedUser = await UsersService.deactivateUser(userId);
-            Logger.info(`Admin ${req.user?.username} deactivated user ${id} (reqId=${req.headers['x-request-id'] || 'n/a'})`);
+            const deactivatedUser = await UsersService.deactivateUser(userId, actor.id);
+            Logger.info(`Admin ${actor.username} deactivated user ${id} (reqId=${req.headers['x-request-id'] || 'n/a'})`);
             return res.status(200).json(deactivatedUser);
 
         } catch (error: any) {
@@ -118,6 +130,9 @@ export class UsersController {
 
     static async activateUser(req: Request, res: Response) {
         try {
+            const actor = req.user;
+            if (!actor) return res.status(401).json({ message: 'Not authenticated' });
+
             const { id } = req.params;
             const userId = parseInt(id);
 
@@ -125,8 +140,8 @@ export class UsersController {
                 return res.status(400).json({ message: 'Invalid user ID' });
             }
 
-            const activatedUser = await UsersService.activateUser(userId);
-            Logger.info(`Admin ${req.user?.username} activated user ${id} (reqId=${req.headers['x-request-id'] || 'n/a'})`);
+            const activatedUser = await UsersService.activateUser(userId, actor.id);
+            Logger.info(`Admin ${actor.username} activated user ${id} (reqId=${req.headers['x-request-id'] || 'n/a'})`);
             return res.status(200).json(activatedUser);
 
         } catch (error: any) {

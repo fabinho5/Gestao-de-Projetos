@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { UserRole } from '@prisma/client';
+import { auditLogService } from './auditLog.service.js';
 
 export class UsersService {
     
@@ -44,7 +45,7 @@ export class UsersService {
         return user;
     }
 
-    static async updateUser(userId: number, data: { username?: string, email?: string, fullName?: string, role?: UserRole }) {
+    static async updateUser(userId: number, data: { username?: string, email?: string, fullName?: string, role?: UserRole }, performedByUserId: number) {
         const existingUser = await prisma.user.findUnique({ where: { id: userId } });
         if (!existingUser) throw new Error("User not found");
 
@@ -78,10 +79,33 @@ export class UsersService {
             }
         });
 
+        const updatedFields = Object.entries({
+            username: data.username,
+            email: data.email,
+            fullName: data.fullName,
+            role: data.role
+        })
+            .filter(([key, value]) => value !== undefined && (existingUser as any)[key] !== value)
+            .map(([key]) => key);
+
+        if (updatedFields.length) {
+            // Track which profile fields an admin changed.
+            await auditLogService.record({
+                userId: performedByUserId,
+                action: 'USER_UPDATE',
+                entity: 'USER',
+                entityId: userId,
+                details: {
+                    targetUserId: userId,
+                    updatedFields,
+                },
+            });
+        }
+
         return updatedUser;
     }
 
-    static async deactivateUser(userId: number) {
+    static async deactivateUser(userId: number, performedByUserId: number) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) throw new Error("User not found");
 
@@ -103,10 +127,21 @@ export class UsersService {
             }
         });
 
+        // Remember every deactivation for compliance investigations.
+        await auditLogService.record({
+            userId: performedByUserId,
+            action: 'USER_DEACTIVATE',
+            entity: 'USER',
+            entityId: userId,
+            details: {
+                targetUserId: userId,
+            },
+        });
+
         return deactivated;
     }
 
-    static async activateUser(userId: number) {
+    static async activateUser(userId: number, performedByUserId: number) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) throw new Error("User not found");
 
@@ -125,6 +160,17 @@ export class UsersService {
                 createdAt: true,
                 updatedAt: true
             }
+        });
+
+        // Log when an admin reactivates a user account.
+        await auditLogService.record({
+            userId: performedByUserId,
+            action: 'USER_ACTIVATE',
+            entity: 'USER',
+            entityId: userId,
+            details: {
+                targetUserId: userId,
+            },
         });
 
         return activated;
