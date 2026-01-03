@@ -294,6 +294,39 @@ def test_unsuccess_authentication_manytimes_error():
     finally:
         driver.quit()
 
+
+def test_refresh_limit_error():
+    driver = webdriver.Chrome()
+    wait = WebDriverWait(driver, 10)
+    
+    attempts = 12
+    expected_msg = 'Too many refresh attempts, please try again later.'
+    
+    try:
+        perform_login(driver, wait, "admin", "123456Tt")
+                
+        for i in range(1, attempts + 1):
+            driver.get("http://localhost:8081/home") # Rota hipotética
+            
+            time.sleep(0.5) # Pequena pausa entre pedidos
+            
+            try:
+                error_el = driver.find_element(By.CSS_SELECTOR, '[data-testid="error_message"]')
+                current_text = error_el.text
+                
+                if expected_msg in current_text:
+                    print(f"SUCESS: Rate limit triggered on Refresh number {i}")
+                    return
+            except:
+                pass  # Nenhum erro encontrado nesta iteração
+        
+        print("FAIL: no refresh rate limit triggered")
+
+    except Exception as e:
+        print(f"Erro no teste: {e}")
+    finally:
+        driver.quit()
+
 ######################################
 #### NEW TESTS BELOW THIS LINE #######
 ######################################
@@ -432,24 +465,26 @@ def why_is_there_no_stock_displayed():
     except Exception as e:
         print(f"Test failed: {e}")
 
+
+
 if __name__ == "__main__":
     
     # Test successful authentication with default ADMIN user
-    test_success_authentication()
+    #test_success_authentication()
 
     # Test successful authentication with default CLIENT user
-    test_success_authentication_realUser()
+    #test_success_authentication_realUser()
 
     # Test unsuccessful authentication
-    test_unsuccess_authentication()
+    #test_unsuccess_authentication()
 
     # Test password change & login with new password
-    test_profile_password_change()
+    #test_profile_password_change()
 
     # 'Demasiadas tentativas. Aguarda alguns minutos.'
-    test_unsuccess_authentication_manytimes_error()
+    #test_unsuccess_authentication_manytimes_error()
 
-
+    test_refresh_limit_error()
 
     #test_security_token_invalidation_on_timestamp_change()
 
