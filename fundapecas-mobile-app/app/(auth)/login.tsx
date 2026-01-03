@@ -110,6 +110,7 @@ export default function LoginScreen() {
                                 <View className="flex-row items-center bg-blue-50 rounded-xl px-4 py-3 border border-blue-100">
                                     <Ionicons name="person-outline" size={20} color="#3b82f6" />
                                     <TextInput
+                                        testID="username-input"
                                         className="flex-1 ml-3 text-base text-gray-800"
                                         placeholder="Introduz o teu username"
                                         placeholderTextColor="#9ca3af"
@@ -134,6 +135,7 @@ export default function LoginScreen() {
                                 <View className="flex-row items-center bg-blue-50 rounded-xl px-4 py-3 border border-blue-100">
                                     <Ionicons name="lock-closed-outline" size={20} color="#3b82f6" />
                                     <TextInput
+                                        testID="password-input"
                                         className="flex-1 ml-3 text-base text-gray-800"
                                         placeholder="Introduz a tua palavra-passe"
                                         placeholderTextColor="#9ca3af"
@@ -165,7 +167,7 @@ export default function LoginScreen() {
                             {errorMessage ? (
                                 <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex-row items-center">
                                     <Ionicons name="alert-circle-outline" size={20} color="#dc2626" />
-                                    <Text className="text-red-600 text-sm ml-2 flex-1">
+                                    <Text testID = "error_message" className="text-red-600 text-sm ml-2 flex-1">
                                         {errorMessage}
                                     </Text>
                                 </View>
@@ -183,6 +185,7 @@ export default function LoginScreen() {
 
                             {/* Login Button */}
                             <TouchableOpacity
+                                testID="login-button"
                                 onPress={handleLogin}
                                 disabled={loading}
                                 className={`bg-blue-600 rounded-xl py-4 items-center shadow-sm ${

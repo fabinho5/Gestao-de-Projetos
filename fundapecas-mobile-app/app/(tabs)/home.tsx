@@ -44,6 +44,7 @@ export default function HomeScreen() {
             <View className="flex-row items-center bg-gray-100 mx-4 mt-4 px-4 py-3 rounded-2xl shadow-sm">
                 <Ionicons name="search" size={22} color="#64748b" />
                 <TextInput
+                    testID="search-bar-input"
                     className="flex-1 ml-3 text-base text-gray-800"
                     placeholder="Pesquisar peças..."
                     placeholderTextColor="#9ca3af"

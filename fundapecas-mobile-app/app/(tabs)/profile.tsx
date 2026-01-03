@@ -249,6 +249,7 @@ export default function ProfileScreen() {
                     {/* Botão Alterar Password */}
                     {!showPasswordForm ? (
                         <TouchableOpacity
+                            testID="passwordchange-button"
                             onPress={() => setShowPasswordForm(true)}
                             className="bg-blue-600 rounded-xl py-4 items-center flex-row justify-center shadow-sm"
                         >
@@ -276,6 +277,7 @@ export default function ProfileScreen() {
                                 <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-gray-200">
                                     <Ionicons name="lock-closed-outline" size={20} color="#3b82f6" />
                                     <TextInput
+                                        testID ="passwordatual-input"
                                         className="flex-1 ml-3 text-base text-gray-800"
                                         placeholder="Password atual"
                                         placeholderTextColor="#9ca3af"
@@ -305,6 +307,7 @@ export default function ProfileScreen() {
                                 <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-gray-200">
                                     <Ionicons name="lock-closed-outline" size={20} color="#3b82f6" />
                                     <TextInput
+                                        testID = "passwordnova-input"
                                         className="flex-1 ml-3 text-base text-gray-800"
                                         placeholder="Nova password"
                                         placeholderTextColor="#9ca3af"
@@ -334,6 +337,7 @@ export default function ProfileScreen() {
                                 <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-gray-200">
                                     <Ionicons name="lock-closed-outline" size={20} color="#3b82f6" />
                                     <TextInput
+                                        testID ="passwordnovaconfirm-input"
                                         className="flex-1 ml-3 text-base text-gray-800"
                                         placeholder="Confirmar password"
                                         placeholderTextColor="#9ca3af"
@@ -376,6 +380,7 @@ export default function ProfileScreen() {
 
                             {/* Botão Confirmar */}
                             <TouchableOpacity
+                                testID="passwordchangeconfirmation-button"
                                 onPress={handleChangePassword}
                                 disabled={updating}
                                 className={`bg-blue-600 rounded-xl py-4 items-center shadow-sm ${
