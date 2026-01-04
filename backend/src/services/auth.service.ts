@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { UserRole } from '@prisma/client';
+import { auditLogService } from './auditLog.service.js';
 
 export class AuthService {
 
@@ -115,6 +116,17 @@ export class AuthService {
                 refreshToken: null
             }
         });
+
+        // Log user-initiated password changes for accountability.
+        await auditLogService.record({
+            userId,
+            action: 'USER_PASSWORD_CHANGE',
+            entity: 'USER',
+            entityId: userId,
+            details: {
+                targetUserId: userId,
+            },
+        });
     }
 
     static async logout(userId: number) {
@@ -165,10 +177,28 @@ export class AuthService {
             }
         });
 
+        // Capture admin-triggered resets separately from self-service changes.
+        await auditLogService.record({
+            userId: adminId,
+            action: 'USER_PASSWORD_RESET',
+            entity: 'USER',
+            entityId: targetUserId,
+            details: {
+                targetUserId: targetUserId,
+            },
+        });
+
         return { userId: targetUserId, username: targetUser.username };
     }
 
-    static async register(username: string, email: string | null, fullName: string, passwordRaw: string, role: UserRole) {
+    static async register(
+        username: string,
+        email: string | null,
+        fullName: string,
+        passwordRaw: string,
+        role: UserRole,
+        createdByUserId: number
+    ) {
         const existingUsername = await prisma.user.findUnique({ where: { username } });
         if (existingUsername) throw new Error("Username already exists");
 
@@ -181,6 +211,18 @@ export class AuthService {
 
         const newUser = await prisma.user.create({
             data: { username, email: email || '', fullName, passwordHash, role }
+        });
+
+        // Track admin-created accounts to show who onboarded the user.
+        await auditLogService.record({
+            userId: createdByUserId,
+            action: 'USER_CREATE',
+            entity: 'USER',
+            entityId: newUser.id,
+            details: {
+                targetUserId: newUser.id,
+                role,
+            },
         });
 
         return {

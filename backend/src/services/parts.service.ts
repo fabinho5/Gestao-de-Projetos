@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { PartCondition, Prisma } from '@prisma/client';
 import { stockMovementService } from './stockMovement.service.js';
+import { auditLogService } from './auditLog.service.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -181,14 +182,14 @@ export class PartsService {
         return { part, movements, reservations };
     }
 
-    static async setVisibility(ref: string, isVisible: boolean) {
+    static async setVisibility(ref: string, isVisible: boolean, updatedByUserId: number) {
         const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
 
         if (!part) {
             throw new NotFoundError('Part not found');
         }
 
-        return prisma.part.update({
+        const updated = await prisma.part.update({
             where: { id: part.id },
             data: { isVisible },
             include: {
@@ -199,6 +200,20 @@ export class PartsService {
                 subReferences: true
             }
         });
+
+        // Record every visibility toggle so we know who hid or exposed a part.
+        await auditLogService.record({
+            userId: updatedByUserId,
+            action: 'PART_VISIBILITY',
+            entity: 'PART',
+            entityId: part.id,
+            details: {
+                refInternal: part.refInternal,
+                isVisible,
+            },
+        });
+
+        return updated;
     }
 
     static async addImage(ref: string, data: { url: string; isMain?: boolean }) {
@@ -292,7 +307,7 @@ export class PartsService {
         locationId: number;
         specifications?: { specId: number; value: string }[];
         subReferences?: string[];
-    }>) {
+    }>, updatedByUserId: number) {
         const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
 
         if (!part) {
@@ -315,13 +330,14 @@ export class PartsService {
         }
 
         try {
+            const { specifications, subReferences, ...simpleFields } = data;
             const updated = await prisma.$transaction(async (tx) => {
                 // Replace specifications if provided
-                if (data.specifications) {
+                if (specifications) {
                     await tx.partSpecification.deleteMany({ where: { partId: part.id } });
-                    if (data.specifications.length) {
+                    if (specifications.length) {
                         await tx.partSpecification.createMany({
-                            data: data.specifications.map((s) => ({
+                            data: specifications.map((s) => ({
                                 partId: part.id,
                                 specId: s.specId,
                                 value: s.value,
@@ -331,20 +347,18 @@ export class PartsService {
                 }
 
                 // Replace subReferences if provided
-                if (data.subReferences) {
+                if (subReferences) {
                     await tx.partReference.deleteMany({ where: { partId: part.id } });
-                    if (data.subReferences.length) {
+                    if (subReferences.length) {
                         await tx.partReference.createMany({
-                            data: data.subReferences.map((value) => ({ partId: part.id, value })),
+                            data: subReferences.map((value) => ({ partId: part.id, value })),
                         });
                     }
                 }
 
-                const { specifications, subReferences, ...rest } = data;
-
                 return tx.part.update({
                     where: { id: part.id },
-                    data: rest,
+                    data: simpleFields,
                     include: {
                         category: true,
                         location: true,
@@ -353,6 +367,25 @@ export class PartsService {
                         subReferences: true,
                     },
                 });
+            });
+
+            const updatedFields = [
+                ...Object.keys(simpleFields),
+                ...(specifications ? ['specifications'] : []),
+                ...(subReferences ? ['subReferences'] : []),
+            ];
+
+            // Log the field changes so auditors can spot what was edited.
+            await auditLogService.record({
+                userId: updatedByUserId,
+                action: 'PART_UPDATE',
+                entity: 'PART',
+                entityId: part.id,
+                details: {
+                    refInternalBefore: part.refInternal,
+                    refInternalAfter: updated.refInternal,
+                    updatedFields,
+                },
             });
 
             return updated;
@@ -432,6 +465,20 @@ export class PartsService {
             });
 
             await stockMovementService.recordEntry(newpart.id, createdByUserId, data.locationId);
+            // Capture the creation event together with the key attributes.
+            await auditLogService.record({
+                userId: createdByUserId,
+                action: 'PART_CREATE',
+                entity: 'PART',
+                entityId: newpart.id,
+                details: {
+                    refInternal: newpart.refInternal,
+                    categoryId: newpart.categoryId,
+                    locationId: newpart.locationId,
+                    condition: newpart.condition,
+                    price: newpart.price.toString(),
+                },
+            });
             return newpart;
             
         } catch (error: any) {
@@ -449,7 +496,7 @@ export class PartsService {
         }
     }
 
-    static async deletePart(ref: string) {
+    static async deletePart(ref: string, deletedByUserId: number) {
         const part = await prisma.part.findFirst({ where: { refInternal: ref, deletedAt: null } });
 
         if (!part) {
@@ -459,6 +506,17 @@ export class PartsService {
         await prisma.part.update({
             where: { id: part.id },
             data: { deletedAt: new Date(), isVisible: false }
+        });
+
+        // Track soft deletes to know who removed an item from circulation.
+        await auditLogService.record({
+            userId: deletedByUserId,
+            action: 'PART_DELETE',
+            entity: 'PART',
+            entityId: part.id,
+            details: {
+                refInternal: part.refInternal,
+            },
         });
 
         // here was this line

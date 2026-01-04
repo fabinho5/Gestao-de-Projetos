@@ -11,7 +11,7 @@ router.post('/login', loginLimiter, AuthController.login);
 router.post('/refresh', refreshLimiter, AuthController.refresh);
 router.post('/logout', authenticate, AuthController.logout);
 router.get('/me', authenticate, AuthController.getProfile);
-router.post('/change-password', authenticate, requireRole(UserRole.ADMIN), AuthController.changePassword);
+//router.post('/change-password', authenticate, AuthController.changePassword);
 router.post('/register', authenticate, requireRole(UserRole.ADMIN), AuthController.register);
 router.post('/admin/reset-password', authenticate, requireRole(UserRole.ADMIN), AuthController.adminResetPassword);
 

@@ -182,10 +182,13 @@ export class PartsController {
 
     static async updatePart(req: Request, res: Response) {
         try {
+            const user = req.user;
+            if (!user) return res.status(401).json({ message: 'Not authenticated' });
+
             const { ref } = req.params;
             const data = updatePartSchema.parse(req.body);
 
-            const part = await PartsService.updatePart(ref, data);
+            const part = await PartsService.updatePart(ref, data, user.id);
             res.status(200).json(part);
         } catch (error: any) {
             if (error instanceof z.ZodError) {
@@ -211,8 +214,11 @@ export class PartsController {
 
     static async deletePart(req: Request, res: Response) {
         try {
+            const user = req.user;
+            if (!user) return res.status(401).json({ message: 'Not authenticated' });
+
             const { ref } = req.params;
-            await PartsService.deletePart(ref);
+            await PartsService.deletePart(ref, user.id);
             res.status(204).send();
         } catch (error) {
             if (error instanceof NotFoundError) {
@@ -226,10 +232,13 @@ export class PartsController {
 
     static async setVisibility(req: Request, res: Response) {
         try {
+            const user = req.user;
+            if (!user) return res.status(401).json({ message: 'Not authenticated' });
+
             const { ref } = req.params;
             const { isVisible } = visibilitySchema.parse(req.body);
 
-            const part = await PartsService.setVisibility(ref, isVisible);
+            const part = await PartsService.setVisibility(ref, isVisible, user.id);
             res.status(200).json(part);
         } catch (error: any) {
             if (error instanceof z.ZodError) {
