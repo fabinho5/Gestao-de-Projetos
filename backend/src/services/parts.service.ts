@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { PartCondition, Prisma } from '@prisma/client';
+import { PartCondition, Prisma, ReservationStatus, CancelReason } from '@prisma/client';
 import { stockMovementService } from './stockMovement.service.js';
 import fs from 'fs';
 import path from 'path';
@@ -22,6 +22,7 @@ export type SearchPartsParams = {
     priceMax?: number;
     locationId?: number;
     isVisible?: boolean;
+    available?: boolean;
     sortBy: SortField;
     sortOrder: 'asc' | 'desc';
     page: number;
@@ -84,6 +85,7 @@ export class PartsService {
             priceMax,
             locationId,
             isVisible,
+            available,
             sortBy,
             sortOrder,
             page,
@@ -96,6 +98,28 @@ export class PartsService {
         if (condition) where.condition = condition;
         if (locationId !== undefined) where.locationId = locationId;
         if (isVisible !== undefined) where.isVisible = isVisible;
+
+        if (available === true) {
+            // Only parts without active/damaged reservations
+            where.reservations = {
+                none: {
+                    OR: [
+                        { status: { not: ReservationStatus.CANCELLED } },
+                        { status: ReservationStatus.CANCELLED, cancelReason: CancelReason.DAMAGED_RETURN },
+                    ],
+                },
+            };
+        } else if (available === false) {
+            // Only parts that have an active or damaged reservation
+            where.reservations = {
+                some: {
+                    OR: [
+                        { status: { not: ReservationStatus.CANCELLED } },
+                        { status: ReservationStatus.CANCELLED, cancelReason: CancelReason.DAMAGED_RETURN },
+                    ],
+                },
+            };
+        }
 
         if (priceMin !== undefined || priceMax !== undefined) {
             where.price = {
