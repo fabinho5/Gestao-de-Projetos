@@ -507,7 +507,7 @@ const MovementPart = () => {
                                 onPress={() => setShowForm(false)}
                                 disabled={submitting}
                             >
-                                <Text style={styles.modalButtonText}>Cancelar</Text>
+                                <Text style={styles.cancelButtonText}>Cancelar</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -748,6 +748,11 @@ const styles = StyleSheet.create({
     },
     cancelButton: {
         backgroundColor: '#f3f4f6',
+    },
+    cancelButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#6b7280',
     },
     submitButton: {
         backgroundColor: '#3b82f6',

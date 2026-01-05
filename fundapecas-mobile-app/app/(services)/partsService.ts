@@ -64,6 +64,14 @@ export interface Part {
     subReferences?: SubReference[];
 }
 
+export interface SearchPartsResponse {
+    items: Part[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+}
+
 export interface PaginatedParts {
     parts: Part[];
     currentPage: number;
@@ -88,6 +96,20 @@ export interface CreatePartData {
 export interface ApiError {
     message: string;
     statusCode?: number;
+}
+
+export interface SearchPartsParams {
+    text?: string;
+    categoryId?: number;
+    condition?: PartCondition;
+    priceMin?: number;
+    priceMax?: number;
+    locationId?: number;
+    isVisible?: boolean;
+    page?: number;
+    pageSize?: number;
+    sortBy?: 'name' | 'price' | 'createdAt' | 'updatedAt' | 'refInternal';
+    sortOrder?: 'asc' | 'desc';
 }
 
 const getToken = async (): Promise<string | null> => {
@@ -221,9 +243,9 @@ export const getPartById = async (id: string | number): Promise<Part> => {
     }
 };
 
-export const getAllParts = async (): Promise<Part[]> => {
+export const searchParts = async (params: SearchPartsParams = {}): Promise<SearchPartsResponse> => {
     try {
-        console.log('📄 Carregando peças...');
+        console.log('🔍 Pesquisando peças...');
         
         const token = await getToken();
 
@@ -234,7 +256,25 @@ export const getAllParts = async (): Promise<Part[]> => {
             } as ApiError;
         }
 
-        const response = await fetch(`${API_URL}/parts`, {
+        // Construir query string
+        const queryParams = new URLSearchParams();
+        
+        if (params.text) queryParams.append('text', params.text);
+        if (params.categoryId) queryParams.append('categoryId', params.categoryId.toString());
+        if (params.condition) queryParams.append('condition', params.condition);
+        if (params.priceMin !== undefined) queryParams.append('priceMin', params.priceMin.toString());
+        if (params.priceMax !== undefined) queryParams.append('priceMax', params.priceMax.toString());
+        if (params.locationId) queryParams.append('locationId', params.locationId.toString());
+        if (params.isVisible !== undefined) queryParams.append('isVisible', params.isVisible.toString());
+        if (params.page) queryParams.append('page', params.page.toString());
+        if (params.pageSize) queryParams.append('pageSize', params.pageSize.toString());
+        if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+        if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+
+        const url = `${API_URL}/parts/search${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        console.log('🔗 URL:', url);
+
+        const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -250,13 +290,13 @@ export const getAllParts = async (): Promise<Part[]> => {
             }
             
             throw {
-                message: 'Erro ao carregar peças',
+                message: 'Erro ao pesquisar peças',
                 statusCode: response.status,
             } as ApiError;
         }
 
         const data = await response.json();
-        console.log('✅ Peças carregadas com sucesso:', data.length);
+        console.log('✅ Peças carregadas com sucesso:', data.total);
         
         return data;
     } catch (error) {

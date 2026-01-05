@@ -16,63 +16,105 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../(shared)/Header';
 import SearchBar from '../(shared)/SearchBar';
+import FilterPanel, { FilterState } from '../(shared)/FilterPanel';
 import {
-    getAllParts,
-    paginateParts,
+    searchParts,
     formatPrice,
     getConditionName,
+    getCategories,
     Part,
-    PaginatedParts,
     ApiError,
+    SearchPartsResponse,
+    Category,
 } from '../(services)/partsService';
+//import { getLocations, Location } from '';
 import { getUserFavorites } from '../(services)/favoritesService';
 
 const PADDING = 5;
 const GAP = 16;
 const COLUMNS = 4;
+const ITEMS_PER_PAGE = 20;
 
 const Parts = () => {
     const router = useRouter();
-    const [allParts, setAllParts] = useState<Part[]>([]);
-    const [paginatedData, setPaginatedData] = useState<PaginatedParts>({
-        parts: [],
-        currentPage: 1,
+    const [searchData, setSearchData] = useState<SearchPartsResponse>({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: ITEMS_PER_PAGE,
         totalPages: 0,
-        totalItems: 0,
-        itemsPerPage: 20,
     });
     const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+    const [filterPanelVisible, setFilterPanelVisible] = useState(false);
+    const [activeFilters, setActiveFilters] = useState<FilterState>({
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+    });
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [locations, setLocations] = useState<Location[]>([]);
 
-    // Calcular largura do card
     const screenWidth = Dimensions.get('window').width;
-    const cardWidth = (screenWidth - (PADDING * 2) - (GAP * (COLUMNS - 1))) / (COLUMNS * 1.025);
+    const cardWidth = (screenWidth - (PADDING * 2) - (GAP * (COLUMNS - 1))) / COLUMNS;
 
-    // Carregar peças ao montar o componente e quando a tela receber foco
     useFocusEffect(
         useCallback(() => {
-            loadParts();
-            loadFavorites();
+            loadInitialData();
         }, [])
     );
 
-    // Atualizar paginação quando a pesquisa ou página mudar
     useEffect(() => {
-        if (allParts.length > 0) {
-            updatePagination(searchQuery, paginatedData.currentPage);
-        }
-    }, [searchQuery, allParts]);
+        loadParts(searchQuery, currentPage, activeFilters);
+    }, [searchQuery, currentPage, activeFilters]);
 
-    const loadParts = async () => {
+    const loadInitialData = async () => {
+        await Promise.all([
+            loadParts(),
+            loadFavorites(),
+            loadCategories(),
+            //loadLocations(),
+        ]);
+    };
+
+    const loadCategories = async () => {
+        try {
+            const data = await getCategories();
+            setCategories(data);
+        } catch (err) {
+            console.error('Erro ao carregar categorias:', err);
+        }
+    };
+
+    /*const loadLocations = async () => {
+        try {
+            const data = await getLocations();
+            setLocations(data);
+        } catch (err) {
+            console.error('Erro ao carregar localizações:', err);
+        }
+    };*/
+
+    const loadParts = async (
+        query: string = '',
+        page: number = 1,
+        filters: FilterState = activeFilters
+    ) => {
         try {
             setLoading(true);
             setError(null);
-            const parts = await getAllParts();
-            setAllParts(parts);
-            updatePagination('', 1, parts);
+
+            const data = await searchParts({
+                text: query || undefined,
+                page,
+                pageSize: ITEMS_PER_PAGE,
+                ...filters,
+            });
+
+            setSearchData(data);
         } catch (err) {
             const apiError = err as ApiError;
             setError(apiError.message);
@@ -93,19 +135,16 @@ const Parts = () => {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await loadParts();
-        await loadFavorites();
+        await Promise.all([
+            loadParts(searchQuery, currentPage, activeFilters),
+            loadFavorites(),
+        ]);
         setRefreshing(false);
-    };
-
-    const updatePagination = (query: string, page: number, parts: Part[] = allParts) => {
-        const paginated = paginateParts(parts, query, page, 20);
-        setPaginatedData(paginated);
     };
 
     const handleSearch = (text: string) => {
         setSearchQuery(text);
-        updatePagination(text, 1);
+        setCurrentPage(1);
     };
 
     const handleChangeText = (text: string) => {
@@ -113,7 +152,7 @@ const Parts = () => {
     };
 
     const goToPage = (page: number) => {
-        updatePagination(searchQuery, page);
+        setCurrentPage(page);
     };
 
     const handleProfilePress = () => {
@@ -137,9 +176,14 @@ const Parts = () => {
         router.push('/Parts/createPart');
     };
 
+    const handleApplyFilters = (filters: FilterState) => {
+        setActiveFilters(filters);
+        setCurrentPage(1);
+    };
+
     const renderPartCard = (part: Part, idx: number, isLastInRow: boolean) => {
         const isFav = favoriteIds.has(part.id);
-        
+
         return (
             <TouchableOpacity
                 key={part.id}
@@ -159,14 +203,13 @@ const Parts = () => {
                             <Ionicons name="image-outline" size={40} color="#9ca3af" />
                         </View>
                     )}
-                    
+
                     <View style={styles.conditionBadge}>
                         <Text style={styles.conditionText}>
                             {getConditionName(part.condition)}
                         </Text>
                     </View>
 
-                    {/* Indicador de Favorito */}
                     {isFav && (
                         <View style={styles.favoriteIndicator}>
                             <Ionicons name="heart" size={14} color="#fff" />
@@ -176,7 +219,7 @@ const Parts = () => {
 
                 <View style={styles.cardBody}>
                     <Text style={styles.partName} numberOfLines={2}>{part.name}</Text>
-                    
+
                     <Text style={styles.partRef} numberOfLines={1}>
                         Ref: {part.refInternal}
                     </Text>
@@ -202,9 +245,9 @@ const Parts = () => {
     };
 
     const renderPartsGrid = () => {
-        const parts = paginatedData.parts;
+        const parts = searchData.items;
         const rows = [];
-        
+
         for (let i = 0; i < parts.length; i += COLUMNS) {
             const rowParts = parts.slice(i, i + COLUMNS);
             rows.push(
@@ -219,14 +262,14 @@ const Parts = () => {
                 </View>
             );
         }
-        
+
         return <>{rows}</>;
     };
 
     const renderPagination = () => {
-        if (paginatedData.totalPages <= 1) return null;
+        if (searchData.totalPages <= 1) return null;
 
-        const { currentPage, totalPages } = paginatedData;
+        const { page: currentPageNum, totalPages } = searchData;
         const pages: number[] = [];
 
         if (totalPages <= 5) {
@@ -235,22 +278,22 @@ const Parts = () => {
             }
         } else {
             pages.push(1);
-            if (currentPage > 3) pages.push(-1);
-            for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+            if (currentPageNum > 3) pages.push(-1);
+            for (let i = Math.max(2, currentPageNum - 1); i <= Math.min(totalPages - 1, currentPageNum + 1); i++) {
                 pages.push(i);
             }
-            if (currentPage < totalPages - 2) pages.push(-2);
+            if (currentPageNum < totalPages - 2) pages.push(-2);
             pages.push(totalPages);
         }
 
         return (
             <View style={styles.pagination}>
                 <TouchableOpacity
-                    style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
-                    onPress={() => currentPage > 1 && goToPage(currentPage - 1)}
-                    disabled={currentPage === 1}
+                    style={[styles.pageButton, currentPageNum === 1 && styles.pageButtonDisabled]}
+                    onPress={() => currentPageNum > 1 && goToPage(currentPageNum - 1)}
+                    disabled={currentPageNum === 1}
                 >
-                    <Ionicons name="chevron-back" size={20} color={currentPage === 1 ? '#9ca3af' : '#3b82f6'} />
+                    <Ionicons name="chevron-back" size={20} color={currentPageNum === 1 ? '#9ca3af' : '#3b82f6'} />
                 </TouchableOpacity>
 
                 {pages.map((page, index) => {
@@ -260,10 +303,10 @@ const Parts = () => {
                     return (
                         <TouchableOpacity
                             key={page}
-                            style={[styles.pageButton, page === currentPage && styles.pageButtonActive]}
+                            style={[styles.pageButton, page === currentPageNum && styles.pageButtonActive]}
                             onPress={() => goToPage(page)}
                         >
-                            <Text style={[styles.pageText, page === currentPage && styles.pageTextActive]}>
+                            <Text style={[styles.pageText, page === currentPageNum && styles.pageTextActive]}>
                                 {page}
                             </Text>
                         </TouchableOpacity>
@@ -271,17 +314,17 @@ const Parts = () => {
                 })}
 
                 <TouchableOpacity
-                    style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
-                    onPress={() => currentPage < totalPages && goToPage(currentPage + 1)}
-                    disabled={currentPage === totalPages}
+                    style={[styles.pageButton, currentPageNum === totalPages && styles.pageButtonDisabled]}
+                    onPress={() => currentPageNum < totalPages && goToPage(currentPageNum + 1)}
+                    disabled={currentPageNum === totalPages}
                 >
-                    <Ionicons name="chevron-forward" size={20} color={currentPage === totalPages ? '#9ca3af' : '#3b82f6'} />
+                    <Ionicons name="chevron-forward" size={20} color={currentPageNum === totalPages ? '#9ca3af' : '#3b82f6'} />
                 </TouchableOpacity>
             </View>
         );
     };
 
-    if (loading) {
+    if (loading && !refreshing) {
         return (
             <View style={styles.centerContainer}>
                 <ActivityIndicator size="large" color="#3b82f6" />
@@ -295,7 +338,7 @@ const Parts = () => {
             <View style={styles.centerContainer}>
                 <Ionicons name="alert-circle-outline" size={64} color="#ef4444" />
                 <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={loadParts}>
+                <TouchableOpacity style={styles.retryButton} onPress={() => loadParts()}>
                     <Text style={styles.retryButtonText}>Tentar novamente</Text>
                 </TouchableOpacity>
             </View>
@@ -305,7 +348,7 @@ const Parts = () => {
     return (
         <View style={styles.container}>
             <Header onProfilePress={handleProfilePress} onLogoutPress={handleLogoutPress} />
-            
+
             <SearchBar
                 placeholder="Pesquisar peças..."
                 onSearch={handleSearch}
@@ -313,14 +356,23 @@ const Parts = () => {
             />
 
             <View style={styles.statsContainer}>
-                <Text style={styles.statsText}>
-                    {paginatedData.totalItems} {paginatedData.totalItems === 1 ? 'peça encontrada' : 'peças encontradas'}
-                </Text>
-                {paginatedData.totalPages > 1 && (
+                <View style={styles.statsLeft}>
                     <Text style={styles.statsText}>
-                        Página {paginatedData.currentPage} de {paginatedData.totalPages}
+                        {searchData.total} {searchData.total === 1 ? 'peça encontrada' : 'peças encontradas'}
                     </Text>
-                )}
+                    {searchData.totalPages > 1 && (
+                        <Text style={styles.statsText}>
+                            Página {searchData.page} de {searchData.totalPages}
+                        </Text>
+                    )}
+                </View>
+                <TouchableOpacity
+                    style={styles.filterButton}
+                    onPress={() => setFilterPanelVisible(true)}
+                >
+                    <Ionicons name="filter" size={20} color="#3b82f6" />
+                    <Text style={styles.filterButtonText}>Filtros</Text>
+                </TouchableOpacity>
             </View>
 
             <ScrollView
@@ -333,18 +385,12 @@ const Parts = () => {
                     />
                 }
             >
-                {paginatedData.parts.length === 0 ? (
+                {searchData.items.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Ionicons name="search-outline" size={64} color="#9ca3af" />
                         <Text style={styles.emptyText}>
-                            {searchQuery ? 'Nenhuma peça encontrada' : 'Nenhuma peça disponível'}
+                            Nenhuma peça encontrada
                         </Text>
-                        {!searchQuery && (
-                            <TouchableOpacity style={styles.emptyButton} onPress={handleCreatePart}>
-                                <Ionicons name="add-circle-outline" size={24} color="#3b82f6" />
-                                <Text style={styles.emptyButtonText}>Criar primeira peça</Text>
-                            </TouchableOpacity>
-                        )}
                     </View>
                 ) : (
                     <>
@@ -354,7 +400,6 @@ const Parts = () => {
                 )}
             </ScrollView>
 
-            {/* FAB - Floating Action Button */}
             <TouchableOpacity
                 style={styles.fab}
                 onPress={handleCreatePart}
@@ -362,6 +407,14 @@ const Parts = () => {
             >
                 <Ionicons name="add" size={28} color="#fff" />
             </TouchableOpacity>
+
+            <FilterPanel
+                visible={filterPanelVisible}
+                onClose={() => setFilterPanelVisible(false)}
+                onApply={handleApplyFilters}
+                categories={categories}
+                locations={locations}
+            />
         </View>
     );
 };
@@ -411,9 +464,28 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#e5e7eb',
     },
+    statsLeft: {
+        flex: 1,
+    },
     statsText: {
         fontSize: 14,
         color: '#6b7280',
+    },
+    filterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#eff6ff',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#3b82f6',
+    },
+    filterButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#3b82f6',
     },
     content: {
         flex: 1,
