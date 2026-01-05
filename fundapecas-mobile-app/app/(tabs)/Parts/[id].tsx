@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     Animated,
     Modal,
+    TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +28,10 @@ import {
     addFavorite,
     removeFavorite,
 } from '../../(services)/favoritesService';
+import {
+    createReservation,
+    CreateReservationData,
+} from '../../(services)/reservationsService';
 
 const PartDetails = () => {
     const router = useRouter();
@@ -39,6 +44,9 @@ const PartDetails = () => {
     const [favoriteLoading, setFavoriteLoading] = useState(false);
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState(false);
+    const [orderModalVisible, setOrderModalVisible] = useState(false);
+    const [orderNotes, setOrderNotes] = useState('');
+    const [orderLoading, setOrderLoading] = useState(false);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [showErrorMessage, setShowErrorMessage] = useState(false);
@@ -60,7 +68,6 @@ const PartDetails = () => {
             setLoading(true);
             setError(null);
             
-            // Convert id to string and validate
             const partId = Array.isArray(id) ? id[0] : id;
             
             if (!partId) {
@@ -129,15 +136,45 @@ const PartDetails = () => {
             if (isFavorite) {
                 await removeFavorite(part.id);
                 setIsFavorite(false);
+                showMessage('Removido dos favoritos', true);
             } else {
                 await addFavorite(part.id);
                 setIsFavorite(true);
+                showMessage('Adicionado aos favoritos', true);
             }
         } catch (err) {
             const apiError = err as ApiError;
             showMessage(apiError.message, false);
         } finally {
             setFavoriteLoading(false);
+        }
+    };
+
+    const handleOpenOrderModal = () => {
+        setOrderModalVisible(true);
+        setOrderNotes('');
+    };
+
+    const handleCreateOrder = async () => {
+        if (!part) return;
+
+        try {
+            setOrderLoading(true);
+
+            const data: CreateReservationData = {
+                partId: part.id,
+                notes: orderNotes.trim() || undefined,
+            };
+
+            await createReservation(data);
+            showMessage('Pedido criado com sucesso!', true);
+            setOrderModalVisible(false);
+            setOrderNotes('');
+        } catch (err) {
+            const apiError = err as ApiError;
+            showMessage(apiError.message || 'Já existe um pedido em aberto para esta peça.', false);
+        } finally {
+            setOrderLoading(false);
         }
     };
 
@@ -149,7 +186,7 @@ const PartDetails = () => {
         try {
             setDeleteLoading(true);
             await deletePart(part.refInternal);
-            // Aguardar um pouco para o usuário ver a mensagem
+            showMessage('Peça eliminada com sucesso', true);
             setTimeout(() => {
                 router.replace('/parts');
             }, 1500);
@@ -224,6 +261,59 @@ const PartDetails = () => {
                 </Animated.View>
             )}
 
+            {/* Modal de Criação de Pedido */}
+            <Modal
+                transparent
+                visible={orderModalVisible}
+                animationType="fade"
+                onRequestClose={() => setOrderModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Ionicons name="basket" size={48} color="#3b82f6" />
+                        <Text style={styles.modalTitle}>Criar Pedido</Text>
+                        <Text style={styles.modalText}>
+                            Deseja criar um pedido para "{part.name}"?
+                        </Text>
+
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Notas (opcional)</Text>
+                            <TextInput
+                                style={styles.textArea}
+                                placeholder="Adicione observações sobre o pedido..."
+                                placeholderTextColor="#9ca3af"
+                                value={orderNotes}
+                                onChangeText={setOrderNotes}
+                                multiline
+                                numberOfLines={4}
+                                textAlignVertical="top"
+                            />
+                        </View>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={styles.modalButtonCancel}
+                                onPress={() => setOrderModalVisible(false)}
+                                disabled={orderLoading}
+                            >
+                                <Text style={styles.modalButtonCancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalButtonConfirm}
+                                onPress={handleCreateOrder}
+                                disabled={orderLoading}
+                            >
+                                {orderLoading ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Text style={styles.modalButtonConfirmText}>Criar Pedido</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
             {/* Modal de Confirmação de Eliminação */}
             <Modal
                 transparent
@@ -295,6 +385,13 @@ const PartDetails = () => {
                                 </Text>
                             </>
                         )}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        onPress={handleOpenOrderModal} 
+                        style={styles.orderButton}
+                    >
+                        <Ionicons name="basket" size={20} color="#fff" />
+                        <Text style={styles.actionButtonText}>Fazer Pedido</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={handleMovement} style={styles.actionButton}>
                         <Ionicons name="swap-horizontal" size={20} color="#fff" />
@@ -542,7 +639,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#6b7280',
         textAlign: 'center',
-        marginBottom: 8,
+        marginBottom: 16,
     },
     modalWarning: {
         fontSize: 12,
@@ -550,6 +647,27 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontWeight: '600',
         marginBottom: 24,
+    },
+    formGroup: {
+        width: '100%',
+        marginBottom: 16,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    textArea: {
+        backgroundColor: '#f9fafb',
+        borderWidth: 1,
+        borderColor: '#d1d5db',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 14,
+        color: '#111827',
+        minHeight: 100,
+        textAlignVertical: 'top',
     },
     modalButtons: {
         flexDirection: 'row',
@@ -567,6 +685,18 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#6b7280',
+    },
+    modalButtonConfirm: {
+        flex: 1,
+        paddingVertical: 12,
+        backgroundColor: '#3b82f6',
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    modalButtonConfirmText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
     },
     modalButtonDelete: {
         flex: 1,
@@ -614,6 +744,15 @@ const styles = StyleSheet.create({
     },
     favoriteButtonActive: {
         backgroundColor: '#eab308',
+    },
+    orderButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#10b981',
+        borderRadius: 8,
     },
     actionButton: {
         flexDirection: 'row',
@@ -810,4 +949,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default PartDetails
+export default PartDetails;

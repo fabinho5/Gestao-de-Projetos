@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuração da API
-const API_URL = 'http://localhost:3002';
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 // ==================== TIPOS ====================
 

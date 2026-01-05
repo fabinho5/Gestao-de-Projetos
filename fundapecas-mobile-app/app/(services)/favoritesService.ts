@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://localhost:3002';
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export interface ApiError {
     message: string;

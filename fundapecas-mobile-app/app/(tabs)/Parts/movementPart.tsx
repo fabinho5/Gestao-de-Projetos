@@ -207,8 +207,10 @@ const MovementPart = () => {
     };
 
     const handleBack = () => {
-        router.back();
+        const partId = Array.isArray(id) ? id[0] : id;
+        router.push(`/Parts/${partId}`);
     };
+
 
     const handleLogoutPress = async () => {
         try {
