@@ -93,6 +93,7 @@ export class PartsService {
         } = params;
 
         const where: Prisma.PartWhereInput = { deletedAt: null };
+        const and: Prisma.PartWhereInput[] = [];
 
         if (categoryId !== undefined) where.categoryId = categoryId;
         if (condition) where.condition = condition;
@@ -100,25 +101,25 @@ export class PartsService {
         if (isVisible !== undefined) where.isVisible = isVisible;
 
         if (available === true) {
-            // Only parts without active/damaged reservations
-            where.reservations = {
-                none: {
-                    OR: [
-                        { status: { not: ReservationStatus.CANCELLED } },
-                        { status: ReservationStatus.CANCELLED, cancelReason: CancelReason.DAMAGED_RETURN },
-                    ],
-                },
-            };
+            // Only parts with no reservation that is active or cancelled due to damage
+            and.push({ reservations: { none: { status: { not: ReservationStatus.CANCELLED } } } });
+            and.push({ reservations: { none: { status: ReservationStatus.CANCELLED, cancelReason: CancelReason.DAMAGED_RETURN } } });
         } else if (available === false) {
             // Only parts that have an active or damaged reservation
-            where.reservations = {
-                some: {
-                    OR: [
-                        { status: { not: ReservationStatus.CANCELLED } },
-                        { status: ReservationStatus.CANCELLED, cancelReason: CancelReason.DAMAGED_RETURN },
-                    ],
+            and.push({
+                reservations: {
+                    some: {
+                        OR: [
+                            { status: { not: ReservationStatus.CANCELLED } },
+                            { status: ReservationStatus.CANCELLED, cancelReason: CancelReason.DAMAGED_RETURN },
+                        ],
+                    },
                 },
-            };
+            });
+        }
+
+        if (and.length) {
+            where.AND = and;
         }
 
         if (priceMin !== undefined || priceMax !== undefined) {
