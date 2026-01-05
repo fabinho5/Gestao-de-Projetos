@@ -2,6 +2,24 @@ import { prisma } from '../src/lib/prisma.js';
 import { PartCondition } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
+async function ensureSpecification(name: string, unit?: string | null) {
+  const existing = await prisma.specification.findFirst({ where: { name } });
+  if (existing) return existing;
+  return prisma.specification.create({ data: { name, unit: unit ?? undefined } });
+}
+
+async function ensureCategory(name: string, parentId?: number | null) {
+  const existing = await prisma.category.findFirst({ where: { name, parentId: parentId ?? undefined } });
+  if (existing) return existing;
+  return prisma.category.create({ data: { name, parentId: parentId ?? undefined } });
+}
+
+async function ensureSupplier(name: string, contact?: string | null) {
+  const existing = await prisma.supplier.findFirst({ where: { name } });
+  if (existing) return existing;
+  return prisma.supplier.create({ data: { name, contact: contact ?? undefined } });
+}
+
 async function main() {
   console.log('🌱 A iniciar o seeding...');
 
@@ -65,20 +83,20 @@ async function main() {
   });
 
   // Especificações
-  const specVoltagem = await prisma.specification.upsert({ where: { name: 'Voltagem' }, update: {}, create: { name: 'Voltagem', unit: 'V' } });
-  const specAmperagem = await prisma.specification.upsert({ where: { name: 'Amperagem' }, update: {}, create: { name: 'Amperagem', unit: 'A' } });
-  const specPeso = await prisma.specification.upsert({ where: { name: 'Peso' }, update: {}, create: { name: 'Peso', unit: 'kg' } });
-  const specLado = await prisma.specification.upsert({ where: { name: 'Lado' }, update: {}, create: { name: 'Lado', unit: undefined } });
+  const specVoltagem = await ensureSpecification('Voltagem', 'V');
+  const specAmperagem = await ensureSpecification('Amperagem', 'A');
+  const specPeso = await ensureSpecification('Peso', 'kg');
+  const specLado = await ensureSpecification('Lado', null);
 
   // Categorias
-  const catMotor = await prisma.category.upsert({ where: { name: 'Motor' }, update: {}, create: { name: 'Motor' } });
-  const catTravagem = await prisma.category.upsert({ where: { name: 'Travagem' }, update: {}, create: { name: 'Travagem' } });
-  const catEletrico = await prisma.category.upsert({ where: { name: 'Componentes Elétricos' }, update: {}, create: { name: 'Componentes Elétricos', parentId: catMotor.id } });
-  const catFiltros = await prisma.category.upsert({ where: { name: 'Filtros' }, update: {}, create: { name: 'Filtros' } });
+  const catMotor = await ensureCategory('Motor');
+  const catTravagem = await ensureCategory('Travagem');
+  const catEletrico = await ensureCategory('Componentes Elétricos', catMotor.id);
+  const catFiltros = await ensureCategory('Filtros');
 
   // Suppliers
-  const supplierBosch = await prisma.supplier.upsert({ where: { name: 'Bosch' }, update: {}, create: { name: 'Bosch', contact: 'bosch@example.com' } });
-  const supplierValeo = await prisma.supplier.upsert({ where: { name: 'Valeo' }, update: {}, create: { name: 'Valeo', contact: 'valeo@example.com' } });
+  const supplierBosch = await ensureSupplier('Bosch', 'bosch@example.com');
+  const supplierValeo = await ensureSupplier('Valeo', 'valeo@example.com');
 
   // Helper to find location IDs
   const locW01S01 = warehouse.locations.find((l) => l.fullCode === 'W01-R01-S01');
