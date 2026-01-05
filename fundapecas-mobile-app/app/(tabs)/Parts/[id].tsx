@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -13,6 +13,7 @@ import {
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import Header from '../../(shared)/Header';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -53,9 +54,12 @@ const PartDetails = () => {
     const [errorMessageText, setErrorMessageText] = useState('');
     const fadeAnim = useState(new Animated.Value(0))[0];
 
-    useEffect(() => {
-        loadPartDetails();
-    }, [id]);
+    // Recarregar dados sempre que a tela é focada
+    useFocusEffect(
+        useCallback(() => {
+            loadPartDetails();
+        }, [id])
+    );
 
     useEffect(() => {
         if (part?.id) {

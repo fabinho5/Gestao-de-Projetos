@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import Header from '../../(shared)/Header';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -95,9 +96,26 @@ const CreatePart = () => {
     const [locations, setLocations] = useState<Location[]>([]);
     const [availableSpecs, setAvailableSpecs] = useState<Specification[]>([]);
 
-    useEffect(() => {
-        loadFormData();
-    }, []);
+    // Resetar formulário sempre que a tela é focada
+    useFocusEffect(
+        useCallback(() => {
+            resetForm();
+            loadFormData();
+        }, [])
+    );
+
+    const resetForm = () => {
+        console.log('🔄 Resetando formulário...');
+        setName('');
+        setRefInternal('');
+        setRefOEM('');
+        setDescription('');
+        setPrice('');
+        setCondition('NEW');
+        setSpecifications([]);
+        setSubReferences(['']);
+        setLoading(false);
+    };
 
     const loadFormData = async () => {
         try {
@@ -137,7 +155,7 @@ const CreatePart = () => {
                 console.error('❌ Erro ao carregar especificações:', error);
             }
 
-            console.log('🔄 Atualizando states...');
+            console.log('📄 Atualizando states...');
             setCategories(categoriesData);
             setLocations(locationsData);
             setAvailableSpecs(specsData);
@@ -153,6 +171,7 @@ const CreatePart = () => {
                 setCategoryId(categoriesData[0].id);
             } else {
                 console.warn('⚠️ Nenhuma categoria disponível para definir como padrão');
+                setCategoryId(undefined);
             }
             
             if (locationsData.length > 0) {
@@ -160,6 +179,7 @@ const CreatePart = () => {
                 setLocationId(locationsData[0].id);
             } else {
                 console.warn('⚠️ Nenhuma localização disponível para definir como padrão');
+                setLocationId(undefined);
             }
         } catch (err) {
             const apiError = err as ApiError;
@@ -417,7 +437,7 @@ const CreatePart = () => {
                                 <Picker
                                     selectedValue={categoryId}
                                     onValueChange={(value) => {
-                                        console.log('🔄 Categoria selecionada:', value);
+                                        console.log('📄 Categoria selecionada:', value);
                                         setCategoryId(value);
                                     }}
                                     style={styles.picker}
@@ -444,7 +464,7 @@ const CreatePart = () => {
                                 <Picker
                                     selectedValue={locationId}
                                     onValueChange={(value) => {
-                                        console.log('🔄 Localização selecionada:', value);
+                                        console.log('📄 Localização selecionada:', value);
                                         setLocationId(value);
                                     }}
                                     style={styles.picker}
