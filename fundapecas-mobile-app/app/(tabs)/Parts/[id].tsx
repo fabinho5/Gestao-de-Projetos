@@ -59,7 +59,17 @@ const PartDetails = () => {
         try {
             setLoading(true);
             setError(null);
-            const partData = await getPartById(id as string);
+            
+            // Convert id to string and validate
+            const partId = Array.isArray(id) ? id[0] : id;
+            
+            if (!partId) {
+                setError('ID da peça não encontrado');
+                setLoading(false);
+                return;
+            }
+            
+            const partData = await getPartById(partId);
             setPart(partData);
         } catch (err) {
             const apiError = err as ApiError;
@@ -156,7 +166,8 @@ const PartDetails = () => {
     };
 
     const handleEdit = () => {
-        router.push(`/Parts/editPart?id=${id}`);
+        const partId = Array.isArray(id) ? id[0] : id;
+        router.push(`/Parts/editPart?id=${partId}`);
     };
 
     const handleLogoutPress = async () => {
@@ -169,7 +180,8 @@ const PartDetails = () => {
     };
 
     const handleMovement = () => {
-        router.push(`/Parts/movementPart?id=${id}`);
+        const partId = Array.isArray(id) ? id[0] : id;
+        router.push(`/Parts/movementPart?id=${partId}`);
     };
 
     if (loading) {
@@ -798,4 +810,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default PartDetails;
+export default PartDetails
