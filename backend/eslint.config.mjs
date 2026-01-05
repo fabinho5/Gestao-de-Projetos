@@ -1,5 +1,13 @@
+// cd backend
+// npx eslint "src/**/*.{ts,js,tsx,jsx}"
+
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default [
   {
@@ -8,7 +16,7 @@ export default [
       parser: tsParser,
       parserOptions: {
         project: "./tsconfig.json",
-        tsconfigRootDir: new URL(".", import.meta.url).pathname,
+        tsconfigRootDir: __dirname,
         sourceType: "module",
         ecmaVersion: 2022,
       },
