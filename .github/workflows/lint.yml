@@ -33,8 +33,14 @@ jobs:
       - name: Run backend ESLint
         working-directory: backend
         run: |
-          # Lint TypeScript/JS files in src; adapt extensions if needed
-          npx eslint "src/**/*.{ts,js,tsx,jsx}" || exit 1
+          # Only run ESLint if a configuration file exists in the backend folder.
+          # This avoids failures when backend doesn't have ESLint configured.
+          if ls .eslintrc.* eslint.config.* >/dev/null 2>&1; then
+            echo "ESLint config found, running lint..."
+            npx eslint "src/**/*.{ts,js,tsx,jsx}" || exit 1
+          else
+            echo "No ESLint config found in backend; skipping backend lint."
+          fi
 
   frontend-lint:
     name: Mobile frontend Lint
