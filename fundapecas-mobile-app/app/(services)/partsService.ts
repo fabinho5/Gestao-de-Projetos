@@ -3,6 +3,32 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Configuração da API
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+// Função helper para construir URLs absolutas de imagens
+const getImageUrl = (relativePath: string): string => {
+    if (!relativePath) {
+        console.log('⚠️ URL vazia recebida');
+        return '';
+    }
+    
+    console.log('📥 URL recebida:', relativePath);
+    
+    // Se já for uma URL absoluta, retorna como está
+    if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+        console.log('✅ URL já é absoluta:', relativePath);
+        return relativePath;
+    }
+    
+    // Remove barra inicial se existir
+    const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+    
+    // Constrói a URL absoluta
+    const fullUrl = `${API_URL}/${cleanPath}`;
+    console.log('🔗 URL construída:', fullUrl);
+    console.log('🌐 API_URL:', API_URL);
+    
+    return fullUrl;
+};
+
 export interface Category {
     id: number;
     name: string;
@@ -121,6 +147,30 @@ const getToken = async (): Promise<string | null> => {
     }
 };
 
+// Função helper para processar as imagens de uma peça
+const processPartImages = (part: Part): Part => {
+    console.log('🖼️ Processando imagens da peça:', part.refInternal);
+    console.log('📊 Total de imagens:', part.images?.length || 0);
+    
+    if (part.images && part.images.length > 0) {
+        const processedImages = part.images.map(img => {
+            const newUrl = getImageUrl(img.url);
+            console.log(`  📸 Imagem ID ${img.id}: ${img.url} → ${newUrl}`);
+            return {
+                ...img,
+                url: newUrl
+            };
+        });
+        
+        return {
+            ...part,
+            images: processedImages
+        };
+    }
+    
+    console.log('⚠️ Nenhuma imagem encontrada para processar');
+    return part;
+};
 
 export const deletePart = async (ref: string): Promise<void> => {
     try {
@@ -229,8 +279,10 @@ export const getPartById = async (id: string | number): Promise<Part> => {
 
         const data = await response.json();
         console.log('✅ Peça carregada com sucesso');
+        console.log('🖼️ Imagens:', data.images);
 
-        return data;
+        // Processa as URLs das imagens
+        return processPartImages(data);
     } catch (error) {
         if ((error as ApiError).message) {
             throw error;
@@ -298,7 +350,11 @@ export const searchParts = async (params: SearchPartsParams = {}): Promise<Searc
         const data = await response.json();
         console.log('✅ Peças carregadas com sucesso:', data.total);
         
-        return data;
+        // Processa as URLs das imagens de todas as peças
+        return {
+            ...data,
+            items: data.items.map(processPartImages)
+        };
     } catch (error) {
         if ((error as ApiError).message) {
             throw error;
@@ -356,7 +412,7 @@ export const getPartByRef = async (ref: string): Promise<Part> => {
         const data = await response.json();
         console.log('✅ Peça carregada com sucesso');
         
-        return data;
+        return processPartImages(data);
     } catch (error) {
         if ((error as ApiError).message) {
             throw error;
@@ -433,7 +489,7 @@ export const createPart = async (data: CreatePartData): Promise<Part> => {
         const part = await response.json();
         console.log('✅ Peça criada com sucesso:', part.refInternal);
         
-        return part;
+        return processPartImages(part);
     } catch (error) {
         if ((error as ApiError).message) {
             throw error;
