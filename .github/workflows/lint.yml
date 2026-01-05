@@ -2,21 +2,22 @@ name: Lint
 
 on:
   push:
-    branches: [ "main", "dev", "tests" ]
+    branches: ["main", "dev", "tests"]
   pull_request:
-    branches: [ "main", "dev", "tests" ]
+    branches: ["main", "dev", "tests"]
 
 jobs:
   backend-lint:
     name: Backend Lint
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Cache backend node modules
         uses: actions/cache@v4
@@ -33,20 +34,10 @@ jobs:
       - name: Run backend ESLint
         working-directory: backend
         run: |
-          # Debug: show current directory and files (helps diagnose missing config)
           echo "Working directory: $(pwd)"
           ls -la
+          npx eslint "src/**/*.{ts,js,tsx,jsx}"
 
-          # Check for common ESLint config filenames explicitly. Globs sometimes
-          # behave differently in non-interactive shells, so -f checks are more
-          # reliable in CI.
-          if [ -f eslint.config.cjs ] || [ -f eslint.config.js ] || \
-             [ -f .eslintrc.cjs ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then
-            echo "ESLint config found, running lint..."
-            npx eslint "src/**/*.{ts,js,tsx,jsx}" || exit 1
-          else
-            echo "No ESLint config found in backend; skipping backend lint."
-          fi
 
   frontend-lint:
     name: Mobile frontend Lint
