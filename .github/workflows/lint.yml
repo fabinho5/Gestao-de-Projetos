@@ -33,9 +33,15 @@ jobs:
       - name: Run backend ESLint
         working-directory: backend
         run: |
-          # Only run ESLint if a configuration file exists in the backend folder.
-          # This avoids failures when backend doesn't have ESLint configured.
-          if ls .eslintrc.* eslint.config.* >/dev/null 2>&1; then
+          # Debug: show current directory and files (helps diagnose missing config)
+          echo "Working directory: $(pwd)"
+          ls -la
+
+          # Check for common ESLint config filenames explicitly. Globs sometimes
+          # behave differently in non-interactive shells, so -f checks are more
+          # reliable in CI.
+          if [ -f eslint.config.cjs ] || [ -f eslint.config.js ] || \
+             [ -f .eslintrc.cjs ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then
             echo "ESLint config found, running lint..."
             npx eslint "src/**/*.{ts,js,tsx,jsx}" || exit 1
           else
