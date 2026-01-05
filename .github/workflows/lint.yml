@@ -1,0 +1,64 @@
+name: Lint
+
+on:
+  push:
+    branches: [ "main", "dev", "tests" ]
+  pull_request:
+    branches: [ "main", "dev", "tests" ]
+
+jobs:
+  backend-lint:
+    name: Backend Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache backend node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: backend-npm-cache-${{ runner.os }}-node-20-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: |
+            backend-npm-cache-${{ runner.os }}-node-20-
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run backend ESLint
+        working-directory: backend
+        run: |
+          # Lint TypeScript/JS files in src; adapt extensions if needed
+          npx eslint "src/**/*.{ts,js,tsx,jsx}" || exit 1
+
+  frontend-lint:
+    name: Mobile frontend Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache frontend node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: frontend-npm-cache-${{ runner.os }}-node-20-${{ hashFiles('fundapecas-mobile-app/package-lock.json') }}
+          restore-keys: |
+            frontend-npm-cache-${{ runner.os }}-node-20-
+
+      - name: Install frontend dependencies
+        working-directory: fundapecas-mobile-app
+        run: npm ci
+
+      - name: Run expo lint
+        working-directory: fundapecas-mobile-app
+        run: npm run lint
