@@ -15,6 +15,13 @@ const createLocationSchema = z.object({
   capacity: z.coerce.number().int().positive().default(1),
 });
 
+const updateLocationSchema = z.object({
+  rack: z.string().trim().min(1).optional(),
+  shelf: z.string().trim().min(1).optional(),
+  pallet: z.string().trim().min(1).optional().nullable(),
+  capacity: z.coerce.number().int().positive().optional(),
+}).refine((val) => Object.keys(val).length > 0, { message: 'At least one field must be provided' });
+
 
 export class WarehouseController {
   static async list(req: Request, res: Response) {
@@ -113,7 +120,39 @@ export class WarehouseController {
     }
   }
 
-    static async capacityCheck(req: Request, res: Response) {
+  static async updateLocation(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ message: 'Invalid location id' });
+      }
+
+      const payload = updateLocationSchema.parse(req.body);
+      const location = await WarehouseService.updateLocation(id, payload);
+      return res.status(200).json(location);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Validation failed', errors: error.errors });
+      }
+
+      if (error instanceof Error && error.message.includes('Location not found')) {
+        return res.status(404).json({ message: error.message });
+      }
+
+      if (error instanceof Error && error.message.includes('fullCode already exists')) {
+        return res.status(409).json({ message: error.message });
+      }
+
+      if (error instanceof Error && error.message.includes('Capacity cannot be less')) {
+        return res.status(400).json({ message: error.message });
+      }
+
+      Logger.error('Error updating location', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  static async capacityCheck(req: Request, res: Response) {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) {
