@@ -113,4 +113,23 @@ export class WarehouseController {
     }
   }
 
+    static async capacityCheck(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ message: 'Invalid location id' });
+      }
+
+      const info = await WarehouseService.capacityCheck(id);
+      return res.status(200).json(info);
+    } catch (error: any) {
+      if (error instanceof Error && error.message.includes('Location not found')) {
+        return res.status(404).json({ message: error.message });
+      }
+
+      Logger.error('Error checking location capacity', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
 }
