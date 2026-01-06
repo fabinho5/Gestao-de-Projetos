@@ -22,6 +22,16 @@ const updateLocationSchema = z.object({
   capacity: z.coerce.number().int().positive().optional(),
 }).refine((val) => Object.keys(val).length > 0, { message: 'At least one field must be provided' });
 
+const searchLocationsSchema = z.object({
+  warehouseId: z.coerce.number().int().positive().optional(),
+  rack: z.string().trim().min(1).optional(),
+  shelf: z.string().trim().min(1).optional(),
+  available: z.preprocess((v) => {
+    if (v === 'true' || v === '1' || v === true) return true;
+    if (v === 'false' || v === '0' || v === false) return false;
+    return v;
+  }, z.boolean().optional()),
+});
 
 export class WarehouseController {
   static async list(req: Request, res: Response) {
@@ -171,4 +181,33 @@ export class WarehouseController {
     }
   }
 
+  static async searchLocations(req: Request, res: Response) {
+    try {
+      const filters = searchLocationsSchema.parse(req.query);
+      const locations = await WarehouseService.searchLocations(filters);
+      res.status(200).json(locations);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Validation failed', errors: error.errors });
+      }
+
+      Logger.error('Error searching locations', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  static async listAvailableLocations(req: Request, res: Response) {
+    try {
+      const filters = searchLocationsSchema.parse(req.query);
+      const locations = await WarehouseService.searchLocations({ ...filters, available: true });
+      res.status(200).json(locations);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Validation failed', errors: error.errors });
+      }
+
+      Logger.error('Error listing available locations', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
 }
