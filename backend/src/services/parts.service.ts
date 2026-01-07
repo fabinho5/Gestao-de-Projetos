@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { PartCondition, Prisma } from '@prisma/client';
+import { PartCondition, Prisma, ReservationStatus, CancelReason } from '@prisma/client';
 import { stockMovementService } from './stockMovement.service.js';
 import { auditLogService } from './auditLog.service.js';
 import fs from 'fs';
@@ -23,6 +23,7 @@ export type SearchPartsParams = {
     priceMax?: number;
     locationId?: number;
     isVisible?: boolean;
+    available?: boolean;
     sortBy: SortField;
     sortOrder: 'asc' | 'desc';
     page: number;
@@ -85,6 +86,7 @@ export class PartsService {
             priceMax,
             locationId,
             isVisible,
+            available,
             sortBy,
             sortOrder,
             page,
@@ -92,11 +94,34 @@ export class PartsService {
         } = params;
 
         const where: Prisma.PartWhereInput = { deletedAt: null };
+        const and: Prisma.PartWhereInput[] = [];
 
         if (categoryId !== undefined) where.categoryId = categoryId;
         if (condition) where.condition = condition;
         if (locationId !== undefined) where.locationId = locationId;
         if (isVisible !== undefined) where.isVisible = isVisible;
+
+        if (available === true) {
+            // Only parts with no reservation that is active or cancelled due to damage
+            and.push({ reservations: { none: { status: { not: ReservationStatus.CANCELLED } } } });
+            and.push({ reservations: { none: { status: ReservationStatus.CANCELLED, cancelReason: CancelReason.DAMAGED_RETURN } } });
+        } else if (available === false) {
+            // Only parts that have an active or damaged reservation
+            and.push({
+                reservations: {
+                    some: {
+                        OR: [
+                            { status: { not: ReservationStatus.CANCELLED } },
+                            { status: ReservationStatus.CANCELLED, cancelReason: CancelReason.DAMAGED_RETURN },
+                        ],
+                    },
+                },
+            });
+        }
+
+        if (and.length) {
+            where.AND = and;
+        }
 
         if (priceMin !== undefined || priceMax !== undefined) {
             where.price = {
