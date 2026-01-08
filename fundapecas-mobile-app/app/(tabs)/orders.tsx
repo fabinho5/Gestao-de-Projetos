@@ -199,10 +199,6 @@ const Orders = () => {
         setSelectedStatus('ALL');
     };
 
-    const handleCreateOrder = () => {
-        router.push('/Orders/createOrder');
-    };
-
     const handleAssignReservation = async (reservationId: number) => {
         setConfirmModal({
             visible: true,
@@ -535,14 +531,6 @@ const Orders = () => {
                     filteredReservations.map(renderReservationCard)
                 )}
             </ScrollView>
-
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={handleCreateOrder}
-                activeOpacity={0.8}
-            >
-                <Ionicons name="add" size={28} color="#fff" />
-            </TouchableOpacity>
 
             {/* Modal de Edição de Status */}
             <Modal
@@ -943,22 +931,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#9ca3af',
     },
-    fab: {
-        position: 'absolute',
-        right: 20,
-        bottom: 20,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#3b82f6',
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-    },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1070,7 +1042,7 @@ const styles = StyleSheet.create({
     },
     toast: {
         position: 'absolute',
-        bottom: 100,
+        bottom: 20,
         left: 20,
         right: 20,
         backgroundColor: '#10b981',

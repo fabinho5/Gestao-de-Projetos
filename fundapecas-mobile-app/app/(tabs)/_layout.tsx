@@ -67,6 +67,18 @@ export default function TabsLayout() {
                     href: null,
                 }}
             />
+            <Tabs.Screen
+                name="Parts/movementPart"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="Parts/editPart"
+                options={{
+                    href: null,
+                }}
+            />
         </Tabs>
     );
 }

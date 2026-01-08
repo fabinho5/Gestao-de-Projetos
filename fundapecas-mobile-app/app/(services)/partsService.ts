@@ -1,7 +1,33 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuração da API
-const API_URL = 'http://localhost:3002';
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+// Função helper para construir URLs absolutas de imagens
+const getImageUrl = (relativePath: string): string => {
+    if (!relativePath) {
+        console.log('⚠️ URL vazia recebida');
+        return '';
+    }
+    
+    console.log('📥 URL recebida:', relativePath);
+    
+    // Se já for uma URL absoluta, retorna como está
+    if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+        console.log('✅ URL já é absoluta:', relativePath);
+        return relativePath;
+    }
+    
+    // Remove barra inicial se existir
+    const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+    
+    // Constrói a URL absoluta
+    const fullUrl = `${API_URL}/${cleanPath}`;
+    console.log('🔗 URL construída:', fullUrl);
+    console.log('🌐 API_URL:', API_URL);
+    
+    return fullUrl;
+};
 
 export interface Category {
     id: number;
@@ -64,6 +90,14 @@ export interface Part {
     subReferences?: SubReference[];
 }
 
+export interface SearchPartsResponse {
+    items: Part[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+}
+
 export interface PaginatedParts {
     parts: Part[];
     currentPage: number;
@@ -90,6 +124,20 @@ export interface ApiError {
     statusCode?: number;
 }
 
+export interface SearchPartsParams {
+    text?: string;
+    categoryId?: number;
+    condition?: PartCondition;
+    priceMin?: number;
+    priceMax?: number;
+    locationId?: number;
+    isVisible?: boolean;
+    page?: number;
+    pageSize?: number;
+    sortBy?: 'name' | 'price' | 'createdAt' | 'updatedAt' | 'refInternal';
+    sortOrder?: 'asc' | 'desc';
+}
+
 const getToken = async (): Promise<string | null> => {
     try {
         return await AsyncStorage.getItem('userToken');
@@ -99,6 +147,30 @@ const getToken = async (): Promise<string | null> => {
     }
 };
 
+// Função helper para processar as imagens de uma peça
+const processPartImages = (part: Part): Part => {
+    console.log('🖼️ Processando imagens da peça:', part.refInternal);
+    console.log('📊 Total de imagens:', part.images?.length || 0);
+    
+    if (part.images && part.images.length > 0) {
+        const processedImages = part.images.map(img => {
+            const newUrl = getImageUrl(img.url);
+            console.log(`  📸 Imagem ID ${img.id}: ${img.url} → ${newUrl}`);
+            return {
+                ...img,
+                url: newUrl
+            };
+        });
+        
+        return {
+            ...part,
+            images: processedImages
+        };
+    }
+    
+    console.log('⚠️ Nenhuma imagem encontrada para processar');
+    return part;
+};
 
 export const deletePart = async (ref: string): Promise<void> => {
     try {
@@ -207,8 +279,10 @@ export const getPartById = async (id: string | number): Promise<Part> => {
 
         const data = await response.json();
         console.log('✅ Peça carregada com sucesso');
+        console.log('🖼️ Imagens:', data.images);
 
-        return data;
+        // Processa as URLs das imagens
+        return processPartImages(data);
     } catch (error) {
         if ((error as ApiError).message) {
             throw error;
@@ -221,9 +295,9 @@ export const getPartById = async (id: string | number): Promise<Part> => {
     }
 };
 
-export const getAllParts = async (): Promise<Part[]> => {
+export const searchParts = async (params: SearchPartsParams = {}): Promise<SearchPartsResponse> => {
     try {
-        console.log('📄 Carregando peças...');
+        console.log('🔍 Pesquisando peças...');
         
         const token = await getToken();
 
@@ -234,7 +308,25 @@ export const getAllParts = async (): Promise<Part[]> => {
             } as ApiError;
         }
 
-        const response = await fetch(`${API_URL}/parts`, {
+        // Construir query string
+        const queryParams = new URLSearchParams();
+        
+        if (params.text) queryParams.append('text', params.text);
+        if (params.categoryId) queryParams.append('categoryId', params.categoryId.toString());
+        if (params.condition) queryParams.append('condition', params.condition);
+        if (params.priceMin !== undefined) queryParams.append('priceMin', params.priceMin.toString());
+        if (params.priceMax !== undefined) queryParams.append('priceMax', params.priceMax.toString());
+        if (params.locationId) queryParams.append('locationId', params.locationId.toString());
+        if (params.isVisible !== undefined) queryParams.append('isVisible', params.isVisible.toString());
+        if (params.page) queryParams.append('page', params.page.toString());
+        if (params.pageSize) queryParams.append('pageSize', params.pageSize.toString());
+        if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+        if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+
+        const url = `${API_URL}/parts/search${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        console.log('🔗 URL:', url);
+
+        const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -250,15 +342,19 @@ export const getAllParts = async (): Promise<Part[]> => {
             }
             
             throw {
-                message: 'Erro ao carregar peças',
+                message: 'Erro ao pesquisar peças',
                 statusCode: response.status,
             } as ApiError;
         }
 
         const data = await response.json();
-        console.log('✅ Peças carregadas com sucesso:', data.length);
+        console.log('✅ Peças carregadas com sucesso:', data.total);
         
-        return data;
+        // Processa as URLs das imagens de todas as peças
+        return {
+            ...data,
+            items: data.items.map(processPartImages)
+        };
     } catch (error) {
         if ((error as ApiError).message) {
             throw error;
@@ -316,7 +412,7 @@ export const getPartByRef = async (ref: string): Promise<Part> => {
         const data = await response.json();
         console.log('✅ Peça carregada com sucesso');
         
-        return data;
+        return processPartImages(data);
     } catch (error) {
         if ((error as ApiError).message) {
             throw error;
@@ -393,7 +489,7 @@ export const createPart = async (data: CreatePartData): Promise<Part> => {
         const part = await response.json();
         console.log('✅ Peça criada com sucesso:', part.refInternal);
         
-        return part;
+        return processPartImages(part);
     } catch (error) {
         if ((error as ApiError).message) {
             throw error;
