@@ -30,6 +30,13 @@ router.get(
 );
 
 router.get(
+  '/:ref/whatsapp-link',
+  authenticate,
+  requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
+  PartsController.getWhatsappLink
+);
+
+router.get(
   '/:ref',
   authenticate,
   requireRole(UserRole.CLIENT, UserRole.SALES, UserRole.WAREHOUSE, UserRole.ADMIN),
