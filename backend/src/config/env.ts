@@ -26,4 +26,6 @@ export const env = {
   domain: getEnv('DOMAIN', 'localhost'),
   
   debugLevel: getEnv('DEBUG_LEVEL', 'info'),
+
+  whatsappSalesNumber: getEnv('WHATSAPP_SALES_NUMBER', '+351 999 999 999'),
 };

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { PartCondition } from '@prisma/client';
 import { PartsService, NotFoundError, ConflictError, BadRequestError } from '../services/parts.service.js';
+import { whatsappService } from '../services/whatsapp.service.js';
 import { Logger } from '../utils/logger.js';
 
 const createPartSchema = z.object({
@@ -142,6 +143,23 @@ export class PartsController {
             }
 
             Logger.error('Error fetching part history', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    static async getWhatsappLink(req: Request, res: Response) {
+        try {
+            const { ref } = req.params;
+            const part = await PartsService.getPartSummary(ref);
+
+            if (!part) {
+                return res.status(404).json({ message: 'Part not found' });
+            }
+
+            const url = whatsappService.buildReservationLink(part.name, part.refInternal);
+            return res.status(200).json({ url });
+        } catch (error) {
+            Logger.error('Error building WhatsApp reservation link', error);
             res.status(500).json({ message: 'Internal server error' });
         }
     }

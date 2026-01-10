@@ -45,6 +45,17 @@ export class PartsService {
         });
     }
 
+    static async getPartSummary(ref: string) {
+        return prisma.part.findFirst({
+            where: { refInternal: ref, deletedAt: null },
+            select: {
+                id: true,
+                name: true,
+                refInternal: true,
+            },
+        });
+    }
+
     static async getPartById(ref: string) {
         return prisma.part.findFirst({
             where: { refInternal: ref, deletedAt: null },
